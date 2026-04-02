@@ -1083,6 +1083,14 @@ function iptvPlay(idx) {
         window.open('potplayer://' + ch.url, '_self');
         if (typeof showToast === 'function') showToast(`🟡 جاري فتح ${ch.name} في PotPlayer...`);
         return;
+    } else if (IPTV.playerChoice === 'external') {
+        // Direct link to trigger system player (Best for Mobile)
+        const a = document.createElement('a');
+        a.href = ch.url;
+        a.target = '_blank';
+        a.click();
+        if (typeof showToast === 'function') showToast(`🔵 جاري فتح ${ch.name} في المشغل الخارجي...`);
+        return;
     }
 
     IPTV.currentCh = ch;

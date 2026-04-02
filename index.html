@@ -360,9 +360,10 @@
           </div>
           <div style="flex:1"></div>
           <select id="iptvPlayerSelect" class="ctrl-btn" style="padding:4px 8px;font-family:'Cairo';background:var(--bg2);color:var(--text);border:1px solid var(--glass-border);border-radius:6px;cursor:pointer;" onchange="iptvChangePlayer(this.value)">
-            <option value="browser">🌐 المتصفح</option>
-            <option value="vlc">🟠 VLC</option>
-            <option value="potplayer">🟡 PotPlayer</option>
+            <option value="browser">🌐 المشغل المدمج (Browser)</option>
+            <option value="external">📱 مشغل النظام الخارجي (أندرويد)</option>
+            <option value="vlc">🟠 VLC Player (ويندوز)</option>
+            <option value="potplayer">🟡 PotPlayer (ويندوز)</option>
           </select>
           <button id="iptvSelectBtn" class="ctrl-btn" onclick="iptvToggleSelectionMode()" title="تحديد متعدد">☑ تحديد</button>
           <button class="ctrl-btn" onclick="exportData()" title="تصدير data.json بكل البيانات" style="gap:5px">
