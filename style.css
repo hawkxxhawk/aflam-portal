@@ -359,21 +359,29 @@ body {
 
 #welcomeIconsGrid {
   display: flex;
-  flex-wrap: nowrap; /* No wrapping to allow horizontal scroll */
-  gap: 16px;
-  justify-content: flex-start; /* Start from left to scroll right */
-  max-width: 95vw; /* Almost full viewport width */
-  overflow-x: auto; /* Enable horizontal scroll */
-  padding: 10px 10px 24px; /* Space for scrollbar and shadow */
-  scrollbar-width: thin; /* Firefox */
-  -webkit-overflow-scrolling: touch; /* Smooth iOS scroll */
-  scroll-snap-type: x mandatory; /* Snap to icons */
+  flex-wrap: wrap; /* Restore wrapping for mobile to see all items */
+  gap: 12px;
+  justify-content: center;
+  max-width: 100%;
+  padding: 10px;
+  overflow-y: auto;
+  max-height: 70vh;
+}
+
+@media screen and (min-width: 769px) {
+  #welcomeIconsGrid {
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+    padding: 10px 10px 24px;
+    scroll-snap-type: x mandatory;
+  }
 }
 
 /* Scroll snap for icons */
 .welcome-icon-item {
   scroll-snap-align: center;
-  flex-shrink: 0; /* Don't shrink to fit */
+  flex-shrink: 0;
 }
 
 /* Custom scrollbar for horizontal scroll */
@@ -911,125 +919,130 @@ body.app-mode #viewerWrapper {
   /* Full screen - overrides top: var(--bar-h) */
 }
 
-/* ===== MOBILE OPTIMIZATIONS ===== */
+/* ===== ANDROID & MOBILE OPTIMIZATIONS (Enhanced) ===== */
 @media screen and (max-width: 768px) {
   :root {
-    --bar-h: 70px;
+    --bar-h: 75px;
   }
 
   /* Compact Top Bar */
   #topBar {
-    padding: 6px 10px;
-    gap: 6px;
-    min-height: 60px;
-  }
-
-  .ctrl-btn span {
-    display: none; /* Hide labels on mobile to save space */
+    padding: 10px 12px;
+    gap: 8px;
+    min-height: 70px;
   }
 
   .ctrl-btn {
-    padding: 10px;
-    border-radius: 12px;
+    padding: 12px; /* Bigger touch target */
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.05);
   }
 
   .ctrl-btn svg {
-    width: 22px;
-    height: 22px;
-    margin: 0;
+    width: 24px;
+    height: 24px;
   }
 
-  #currentSiteLabel {
-    display: none;
-  }
-
-  /* Larger touch icons in strip */
+  /* Icons in Strip */
   .icon-card {
-    min-width: 60px;
-    padding: 4px 6px;
+    min-width: 70px;
+    padding: 6px 8px;
   }
 
   .icon-card img,
   .icon-card .icon-fallback {
-    width: 38px;
-    height: 38px;
-  }
-
-  .icon-card .icon-name {
-    font-size: 11px;
-    max-width: 55px;
-  }
-
-  /* Welcome screen adjustments */
-  .welcome-logo {
-    font-size: 56px;
-  }
-
-  .welcome-content h1 {
-    font-size: 2rem;
-  }
-
-  .welcome-content p {
-    font-size: 0.9rem;
-  }
-
-  #welcomeIconsGrid {
-    gap: 12px;
-  }
-
-  .welcome-icon-item {
-    padding: 12px 14px;
-    min-width: 85px;
-  }
-
-  .welcome-icon-item img,
-  .welcome-icon-item .icon-fallback {
     width: 42px;
     height: 42px;
   }
 
+  .icon-card .icon-name {
+    font-size: 12px;
+    margin-top: 4px;
+  }
+
+  /* Welcome Screen Grid */
+  #welcomeIconsGrid {
+    gap: 14px;
+    padding: 15px;
+    justify-content: center;
+  }
+
+  .welcome-icon-item {
+    padding: 16px 12px;
+    min-width: 100px;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--glass-border);
+  }
+
+  .welcome-icon-item img,
+  .welcome-icon-item .icon-fallback {
+    width: 48px;
+    height: 48px;
+    margin-bottom: 8px;
+  }
+
   .welcome-icon-item span {
-    font-size: 13px;
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  /* Category Selector */
+  .category-selector-wrapper {
+    width: 100%;
+    margin: 10px 0;
+  }
+
+  #currentCategoryBtn {
+    padding: 12px 20px;
+    font-size: 15px;
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* Dropdowns & Menus */
+  .dropdown-menu {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    top: auto;
+    width: 100%;
+    border-radius: 24px 24px 0 0;
+    padding: 20px;
+    background: #12121e;
+    box-shadow: 0 -10px 30px rgba(0,0,0,0.8);
+    transform: translateY(100%);
+    animation: slideUp 0.3s forwards;
+    z-index: 1000;
+  }
+
+  @keyframes slideUp {
+    to { transform: translateY(0); }
+  }
+
+  .dropdown-menu button, 
+  .dropdown-item {
+    padding: 16px;
+    font-size: 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
   }
 
   /* Modals */
   .modal {
-    width: 96vw;
-    border-radius: 16px;
+    width: 94%;
+    margin: 10px;
+    max-height: 90vh;
+    border-radius: 24px;
   }
 
-  .modal-body {
-    padding: 16px;
-  }
-
-  .btn-cancel,
-  .btn-save {
-    flex: 1;
-    padding: 12px;
-  }
-
-  /* Settings dropdown */
-  .dropdown-menu {
-    position: fixed;
-    top: auto;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    border-radius: 20px 20px 0 0;
-    width: 100%;
-    max-height: 80vh;
-    overflow-y: auto;
-    animation: slideUpMobile 0.3s ease both;
-  }
-
-  @keyframes slideUpMobile {
-    from { transform: translateY(100%); }
-    to { transform: translateY(0); }
+  .modal-header h2 { font-size: 1.2rem; }
+  .modal-body { padding: 20px; }
+  
+  input, select, textarea {
+    font-size: 16px; /* Prevent iOS zoom */
+    padding: 14px;
   }
 }
 
-@media screen and (max-width: 400px) {
-  #iconsStrip {
-    display: none; /* Hide top strip on very small screens to give room for buttons */
-  }
-}
+/* ── Scrollbars ── */

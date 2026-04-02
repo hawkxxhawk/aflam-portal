@@ -122,60 +122,97 @@ async function loadDataFromChunks() {
   return null;
 }
 
+// ── Favorites File Logic ──────────────────────────────────────────────
+async function loadFavoritesFromFile() {
+  try {
+    const res = await fetch('./favourit.json?_=' + Date.now());
+    if (res.ok) {
+      const favs = await res.json();
+      if (Array.isArray(favs)) {
+        // Tag them with the special category ID
+        return favs.map(f => ({ ...f, categoryId: 'favorites_folder', isExternalFav: true }));
+      }
+    }
+  } catch (e) {
+    console.warn("favourit.json not found or invalid.");
+  }
+  return [];
+}
+
+async function exportFavoritesOnly() {
+  const favs = shortcuts.filter(s => s.categoryId === 'favorites_folder');
+  if (favs.length === 0) {
+    showToast('⚠️ لا توجد مواقع في مجلد المفضلة لتصديرها');
+    return;
+  }
+  
+  // Clean up metadata before export
+  const cleanFavs = favs.map(({ isExternalFav, ...rest }) => rest);
+  
+  const blob = new Blob([JSON.stringify(cleanFavs, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'favourit.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('✅ تم تصدير ملف favourit.json بنجاح');
+}
+
 async function initApp() {
   try {
-    // 1. Try to load from IndexedDB first (Preferred for all platforms to avoid QuotaExceededError)
-    let disk = null;
+    // Ensure "المفضلة" category exists
+    const hasFavCat = categories.some(c => c.id === 'favorites_folder');
+    if (!hasFavCat) {
+      categories.push({ id: 'favorites_folder', name: 'المفضلة', isSystem: true });
+    }
+
+    // 1. Try to load from IndexedDB first
+    let dbShortcuts = [];
     if (typeof IPTV_DB !== 'undefined') {
-      const dbShortcuts = await IPTV_DB.get('rm_shortcuts');
+      dbShortcuts = await IPTV_DB.get('rm_shortcuts') || [];
       const dbCategories = await IPTV_DB.get('rm_categories');
-      
-      if (dbShortcuts && Array.isArray(dbShortcuts) && dbShortcuts.length > 0) {
+      if (dbShortcuts.length > 0) {
         shortcuts = dbShortcuts;
-        categories = dbCategories || [{ id: 'general', name: 'عام' }];
+        categories = dbCategories || categories;
       }
     }
 
-    // 2. Fallback to localStorage (legacy)
+    // 2. Load external favorites from favourit.json
+    const externalFavs = await loadFavoritesFromFile();
+    
+    // Merge strategy: Remove existing shortcuts with category 'favorites_folder' 
+    // and replace them with the ones from the file to ensure it's "updated from file independently"
+    shortcuts = shortcuts.filter(s => s.categoryId !== 'favorites_folder');
+    shortcuts = [...shortcuts, ...externalFavs];
+
+    // 3. Fallback to localStorage (legacy) if still empty
     if (shortcuts.length === 0) {
       const lsData = localStorage.getItem('rm_shortcuts');
-      const lsCat = localStorage.getItem('rm_categories');
       if (lsData) {
         try {
           const parsed = JSON.parse(lsData);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            shortcuts = parsed;
-            categories = JSON.parse(lsCat) || [{ id: 'general', name: 'عام' }];
-          }
+          if (Array.isArray(parsed) && parsed.length > 0) shortcuts = parsed;
         } catch (e) {}
       }
     }
 
-    // 3. If still no data, load from chunks (First time or reset)
+    // 4. If STILL empty, load from chunks
     if (shortcuts.length === 0) {
-      disk = await loadDataFromChunks();
+      const disk = await loadDataFromChunks();
       if (disk) {
         shortcuts = disk.shortcuts || DEFAULT_SHORTCUTS.map(s => ({ ...s }));
-        categories = disk.categories || [{ id: 'general', name: 'عام' }];
-        
-        // Handle IPTV data from chunks
-        if (disk.iptv_sources && typeof IPTV_DB !== 'undefined') {
-          await IPTV_DB.set('rm_iptv', disk.iptv_sources);
-          if (disk.iptv_playlists) await IPTV_DB.set('rm_iptv_playlists', disk.iptv_playlists);
-          localStorage.setItem('rm_iptv', 'USE_IDB');
-          localStorage.setItem('rm_iptv_playlists', 'USE_IDB');
-          
-          if (disk.iptv_favs) localStorage.setItem('rm_iptv_favs', JSON.stringify(disk.iptv_favs));
-          if (disk.iptv_customCatOrder) localStorage.setItem('rm_iptv_cat_order', JSON.stringify(disk.iptv_customCatOrder));
-          if (disk.iptv_playerChoice) localStorage.setItem('rm_iptv_player', disk.iptv_playerChoice);
+        // Re-merge external favs if they exist
+        if (externalFavs.length > 0) {
+          shortcuts = shortcuts.filter(s => s.categoryId !== 'favorites_folder');
+          shortcuts = [...shortcuts, ...externalFavs];
         }
-        await saveShortcuts(); // Save to IDB
-      } else {
-        // Absolute fallback
-        shortcuts = DEFAULT_SHORTCUTS.map(s => ({ ...s }));
-        categories = [{ id: 'general', name: 'عام' }];
-        await saveShortcuts();
       }
+    }
+
+    // Ensure at least defaults if all fails
+    if (shortcuts.length === 0) {
+      shortcuts = DEFAULT_SHORTCUTS.map(s => ({ ...s }));
     }
 
     // Ensure legacy shortcuts have a category
@@ -184,26 +221,16 @@ async function initApp() {
     renderCategorySelector();
     renderIcons();
     renderWelcomeGrid();
-
-    // Event listeners
     setupEventListeners();
 
-    // Hide global loader
     const loader = document.getElementById('globalLoader');
     if (loader) {
       loader.style.opacity = '0';
       setTimeout(() => loader.remove(), 600);
     }
-
   } catch (err) {
     console.error("Critical Init Error:", err);
-    showToast('⚠️ خطأ في تحميل البيانات. جاري المحاولة مرة أخرى...');
-    // Last ditch effort: Render defaults so screen isn't empty
-    if (shortcuts.length === 0) {
-      shortcuts = DEFAULT_SHORTCUTS.map(s => ({ ...s }));
-      renderIcons();
-      renderWelcomeGrid();
-    }
+    showToast('⚠️ خطأ في تحميل البيانات');
   }
 }
 
@@ -993,15 +1020,16 @@ function renderManageCategoriesList() {
   const list = document.getElementById('categoriesList');
   list.innerHTML = '';
   categories.forEach((c, index) => {
+    const isSystem = c.id === 'general' || c.id === 'favorites_folder';
     const li = document.createElement('li');
     li.innerHTML = `
-      <span class="category-name-display">${escHtml(c.name)}</span>
+      <span class="category-name-display">${escHtml(c.name)} ${isSystem ? '<small style="opacity:0.5">(أساسي)</small>' : ''}</span>
       <div class="cat-actions" style="display:flex;gap:4px;align-items:center;">
-        <button class="cat-btn" onclick="moveCategory('${c.id}', -1)" title="لأعلى" style="font-size:10px; padding:2px 6px; ${index === 0 ? 'opacity:0.3;cursor:not-allowed;' : ''}" ${index === 0 ? 'disabled' : ''}>▲</button>
-        <button class="cat-btn" onclick="moveCategory('${c.id}', 1)" title="لأسفل" style="font-size:10px; padding:2px 6px; ${index === categories.length - 1 ? 'opacity:0.3;cursor:not-allowed;' : ''}" ${index === categories.length - 1 ? 'disabled' : ''}>▼</button>
+        <button class="cat-btn" onclick="moveCategory('${c.id}', -1)" title="لأعلى" style="font-size:10px; padding:2px 6px; ${index === 0 || isSystem ? 'opacity:0.3;cursor:not-allowed;' : ''}" ${index === 0 || isSystem ? 'disabled' : ''}>▲</button>
+        <button class="cat-btn" onclick="moveCategory('${c.id}', 1)" title="لأسفل" style="font-size:10px; padding:2px 6px; ${index === categories.length - 1 || isSystem ? 'opacity:0.3;cursor:not-allowed;' : ''}" ${index === categories.length - 1 || isSystem ? 'disabled' : ''}>▼</button>
         <div style="width:1px;height:16px;background:var(--glass-border);margin:0 2px;"></div>
-        <button class="cat-btn" onclick="renameCategory('${c.id}')" title="تعديل الاسم">✏️</button>
-        ${c.id !== 'general' ? `<button class="cat-btn delete" onclick="deleteCategory('${c.id}')" title="حذف">🗑️</button>` : ''}
+        ${!isSystem ? `<button class="cat-btn" onclick="renameCategory('${c.id}')" title="تعديل الاسم">✏️</button>` : ''}
+        ${!isSystem ? `<button class="cat-btn delete" onclick="deleteCategory('${c.id}')" title="حذف">🗑️</button>` : ''}
       </div>
     `;
     list.appendChild(li);
