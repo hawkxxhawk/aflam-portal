@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>🎬 بوابة الأفلام</title>
+  <meta name="description" content="بوابتك التفاعلية لمواقع بث الأفلام والمسلسلات — وصول سريع لكل مواقعك المفضلة" />
+  
+  <!-- Mobile Web App Meta -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#0a0a14" />
+  <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3658/3658959.png" />
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="iptv.css" />
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</head>
+
+<body>
+  <div id="topBarHoverArea"></div>
+
+  <!-- ===== TOP BAR ===== -->
+  <header id="topBar">
+    <div id="barLeft">
+      <button id="homeBtn" class="ctrl-btn" title="الصفحة الرئيسية" onclick="goHome()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z" />
+          <path d="M9 21V12h6v9" />
+        </svg>
+        <span>الرئيسية</span>
+      </button>
+      <button id="backBtn" class="ctrl-btn hidden" title="الرجوع للخلف" onclick="goBack()"
+        style="background:rgba(255,255,255,0.15)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="15 18 9 12 15 6"></polyline>
+        </svg>
+        <span>رجوع</span>
+      </button>
+      <div id="currentSiteLabel"></div>
+      <button id="iptvBtn" class="ctrl-btn" onclick="openIPTV()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="2" y="7" width="20" height="13" rx="2" />
+          <path d="M7 7V5a5 5 0 0110 0v2" />
+          <circle cx="12" cy="13" r="2" />
+        </svg>
+        <span>تلفزيون مباشر</span>
+      </button>
+
+      <!-- Category Selector Dropdown -->
+      <div class="category-selector-wrapper" style="position:relative">
+        <button id="categoryDropdownBtn" class="ctrl-btn" onclick="toggleCategorySelectMenu()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" />
+          </svg>
+          <span id="currentCategoryLabel">كل المواقع</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            style="width:14px;height:14px;margin-right:4px">
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+        <div id="categorySelectMenu" class="dropdown-menu hidden" style="min-width:180px">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+    </div>
+
+    <div id="iconsStrip" class="icons-strip">
+      <div id="iconsContainer"></div>
+    </div>
+
+    <div id="barRight">
+      <!-- Add Site -->
+      <button id="addBtn" class="ctrl-btn accent" title="إضافة موقع جديد" onclick="openAddModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="12" y1="5" x2="12" y2="19" />
+          <line x1="5" y1="12" x2="19" y2="12" />
+        </svg>
+        <span>إضافة موقع</span>
+      </button>
+
+      <!-- Settings Dropdown -->
+      <div class="settings-wrapper" style="position:relative">
+        <button id="settingsBtn" class="ctrl-btn" title="الإعدادات" onclick="toggleSettingsMenu()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3" />
+            <path
+              d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" />
+          </svg>
+        </button>
+
+        <div id="settingsMenu" class="dropdown-menu hidden">
+
+          <!-- Current Site Options (Hidden when no site is open) -->
+          <div id="siteSettingsGroup" class="hidden">
+            <div class="dropdown-header">خيارات الموقع الحالي</div>
+            <button onclick="openCurrentInBrowser()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
+                <polyline points="15 3 21 3 21 9" />
+                <line x1="10" y1="14" x2="21" y2="3" />
+              </svg>
+              فتح في المتصفح الآن
+            </button>
+            <button id="menuModeToggleBtn" onclick="toggleOpenMode()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path
+                  d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83" />
+              </svg>
+              <span id="modeToggleText">جعل الفتح دائماً للمتصفح</span>
+            </button>
+            <hr class="dropdown-divider" />
+          </div>
+
+          <button onclick="openManageCategoriesModal()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" />
+            </svg>
+            إدارة المجلدات
+          </button>
+
+          <button onclick="openManageSitesModal()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+              <line x1="16" y1="13" x2="8" y2="13" />
+              <line x1="16" y1="17" x2="8" y2="17" />
+              <polyline points="10 9 9 9 8 9" />
+            </svg>
+            إدارة المواقع
+          </button>
+
+          <div class="dropdown-header">إدارة البيانات</div>
+          <button onclick="exportData()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            تصدير البيانات (مضغوط)
+          </button>
+          <label class="dropdown-item file-label">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+              <polyline points="17 8 12 3 7 8" />
+              <line x1="12" y1="3" x2="12" y2="15" />
+            </svg>
+            استيراد البيانات
+            <input type="file" accept=".json,.zip" multiple onchange="importDataFile(event)" style="display:none" />
+          </label>
+        </div>
+      </div>
+    </div>
+
+  </header>
+
+  <!-- ===== WELCOME SCREEN ===== -->
+  <main id="welcomeScreen">
+    <div class="welcome-content">
+      <div class="welcome-logo">🎬</div>
+      <h1>بوابة الأفلام</h1>
+      <p>اختر موقعاً من الشريط العلوي للبدء، أو أضف موقعاً جديداً</p>
+      <div id="welcomeIconsGrid"></div>
+    </div>
+    <div class="bg-orbs">
+      <div class="orb orb1"></div>
+      <div class="orb orb2"></div>
+      <div class="orb orb3"></div>
+    </div>
+  </main>
+
+  <!-- ===== IFRAME VIEWER ===== -->
+  <div id="viewerWrapper" class="hidden">
+    <!-- Blocked site overlay -->
+    <div id="iframeOverlay" class="hidden">
+      <div class="overlay-msg">
+        <span>🔒</span>
+        <p>هذا الموقع لا يسمح بالتضمين — يمكنك فتحه في المتصفح مباشرة</p>
+        <div class="overlay-btns">
+          <button class="btn-save" onclick="openCurrentInBrowser()">🌐 فتح في المتصفح الآن</button>
+          <button class="btn-cancel" onclick="saveModeBrowser()" style="margin-top:8px">💾 احفظ هذا التفضيل
+            دائماً</button>
+        </div>
+      </div>
+    </div>
+    <iframe id="siteFrame" title="عرض الموقع" allowfullscreen
+      sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation"></iframe>
+  </div>
+
+  <!-- ===== CONTEXT MENU ===== -->
+  <div id="contextMenu" class="context-menu hidden">
+    <button id="ctxModeBtn" onclick="ctxToggleMode()">🌐 افتح دائماً في المتصفح</button>
+    <button onclick="ctxEdit()">✏️ تعديل</button>
+    <button onclick="ctxDelete()">🗑️ حذف</button>
+    <button onclick="closeContextMenu()">✕ إلغاء</button>
+  </div>
+
+  <!-- ===== ADD / EDIT MODAL ===== -->
+  <div id="modalOverlay" class="modal-overlay hidden" onclick="handleOverlayClick(event)">
+    <div class="modal" id="modal" role="dialog" aria-modal="true">
+      <div class="modal-header">
+        <h2 id="modalTitle">إضافة موقع جديد</h2>
+        <button class="modal-close" onclick="closeModal()" aria-label="إغلاق">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Icon preview -->
+        <div class="icon-preview-area" onclick="document.getElementById('iconFileInput').click()"
+          title="اضغط لاختيار صورة">
+          <img id="iconPreview" src="" alt="" class="hidden" />
+          <div id="iconPlaceholder">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <rect x="3" y="3" width="18" height="18" rx="3" />
+              <path d="M3 9h18M9 21V9" />
+            </svg>
+            <span>اختر صورة</span>
+          </div>
+        </div>
+        <input type="file" id="iconFileInput" accept="image/*" class="hidden" onchange="handleImageUpload(event)" />
+
+        <div class="form-group">
+          <label for="siteName">اسم الموقع</label>
+          <input type="text" id="siteName" placeholder="مثال: Netflix" autocomplete="off" />
+        </div>
+
+        <div class="form-group">
+          <label for="siteUrl">رابط الموقع</label>
+          <input type="url" id="siteUrl" placeholder="https://..." autocomplete="off" />
+        </div>
+
+        <div class="form-group">
+          <label for="siteCategory">المجلد (الفئة)</label>
+          <select id="siteCategory" class="custom-select">
+            <option value="general">عام</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>لون الخلفية (اختياري)</label>
+          <div class="color-row">
+            <input type="color" id="siteColor" value="#1a1a2e" />
+            <span id="colorPreviewText">#1a1a2e</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-cancel" onclick="closeModal()">إلغاء</button>
+        <button class="btn-save" id="saveBtn" onclick="saveShortcut()">حفظ</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== MANAGE CATEGORIES MODAL ===== -->
+  <div id="manageCategoriesModal" class="modal-overlay hidden"
+    onclick="if(event.target===this) closeManageCategoriesModal()">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>إدارة المجلدات (الفئات)</h2>
+        <button class="modal-close" onclick="closeManageCategoriesModal()">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="category-add-form" style="display:flex;gap:10px">
+          <input type="text" id="newCategoryName" placeholder="اسم المجلد الجديد..." style="flex:1"
+            class="form-input" />
+          <button class="btn-save" onclick="addCategory()">إضافة</button>
+        </div>
+        <div class="categories-list-container">
+          <ul id="categoriesList" class="categories-list">
+            <!-- Populated by JS -->
+          </ul>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancel" onclick="closeManageCategoriesModal()">إغلاق</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== MANAGE SITES MODAL ===== -->
+  <div id="manageSitesModal" class="modal-overlay hidden" onclick="if(event.target===this) closeManageSitesModal()">
+    <div class="modal" style="max-width: 500px;">
+      <div class="modal-header">
+        <h2>إدارة المواقع 📝</h2>
+        <button class="modal-close" onclick="closeManageSitesModal()">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="sites-list-container" style="max-height: 55vh; overflow-y: auto; padding-right: 4px;">
+          <ul id="sitesList" class="categories-list">
+            <!-- Populated by JS -->
+          </ul>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancel" onclick="closeManageSitesModal()">إغلاق</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== IPTV SECTION ===== -->
+  <div id="iptvSection" class="hidden">
+    <div id="iptvLayout">
+      <aside id="iptvSidebar">
+        <div class="sidebar-search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8" />
+            <path d="M21 21l-4.35-4.35" />
+          </svg>
+          <input id="iptvSearchInput" type="text" placeholder="ابحث عن قناة..." oninput="iptvSearch(this.value)" />
+        </div>
+        <div class="sidebar-group">
+          <div class="sidebar-group-title">المصادر
+            <button class="sidebar-add-btn" onclick="openSourceModal()" title="إضافة مصدر">+</button>
+          </div>
+          <div id="sourcesList"></div>
+        </div>
+        <div class="sidebar-group">
+          <div class="sidebar-group-title">قوائم التشغيل
+            <button class="sidebar-add-btn" onclick="openCreatePlaylistModal()" title="قائمة جديدة">+</button>
+          </div>
+          <div id="playlistsList"></div>
+        </div>
+        <div class="sidebar-group" id="languagesGroup">
+          <div class="sidebar-group-title">اللغة</div>
+          <div id="languagesList"></div>
+        </div>
+        <div class="sidebar-group">
+          <div class="sidebar-group-title">التصنيفات</div>
+          <div id="iptvCategoriesList"></div>
+        </div>
+      </aside>
+      <main id="channelsArea">
+        <div id="iptvTopBar" style="display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--glass-border);background:var(--glass);flex-shrink:0;">
+          <div id="iptvTypeTabs" class="hidden" style="display:flex;gap:8px;flex:1;">
+            <button id="tabLive" class="ctrl-btn active" onclick="switchIptvType('live')">📺 بث مباشر</button>
+            <button id="tabVod" class="ctrl-btn" onclick="switchIptvType('vod')">🎬 أفلام</button>
+            <button id="tabSeries" class="ctrl-btn" onclick="switchIptvType('series')">📺 مسلسلات</button>
+          </div>
+          <div style="flex:1"></div>
+          <select id="iptvPlayerSelect" class="ctrl-btn" style="padding:4px 8px;font-family:'Cairo';background:var(--bg2);color:var(--text);border:1px solid var(--glass-border);border-radius:6px;cursor:pointer;" onchange="iptvChangePlayer(this.value)">
+            <option value="browser">🌐 المتصفح</option>
+            <option value="vlc">🟠 VLC</option>
+            <option value="potplayer">🟡 PotPlayer</option>
+          </select>
+          <button id="iptvSelectBtn" class="ctrl-btn" onclick="iptvToggleSelectionMode()" title="تحديد متعدد">☑ تحديد</button>
+          <button class="ctrl-btn" onclick="exportData()" title="تصدير data.json بكل البيانات" style="gap:5px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px">
+              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            حفظ
+          </button>
+        </div>
+        <div id="channelsLoading" class="hidden">
+          <div class="iptv-spinner"></div>
+          <p>جاري التحميل...</p>
+        </div>
+        <div id="channelsEmpty">
+          <div class="empty-icon">📡</div>
+          <h3>لا توجد قنوات</h3>
+          <p>أضف مصدر Xtream أو ملف M3U للبدء</p>
+          <button class="ctrl-btn accent" onclick="openSourceModal()">+ إضافة مصدر</button>
+        </div>
+        <div id="channelsGrid" class="hidden"></div>
+      </main>
+    </div>
+
+    <!-- Floating multi-select action bar -->
+    <div id="iptvSelectionBar" class="hidden">
+      <span id="iptvSelCount">0 قناة محددة</span>
+      <div class="sel-bar-actions">
+        <button class="ctrl-btn accent" onclick="iptvAddSelectionToPlaylist()">📋 إضافة لقائمة</button>
+        <button class="ctrl-btn" onclick="iptvClearSelection()">✕ إلغاء التحديد</button>
+        <button class="ctrl-btn" onclick="iptvToggleSelectionMode()">إنهاء</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SOURCE MODAL ===== -->
+  <div id="sourceModal" class="modal-overlay hidden" onclick="handleSourceOverlayClick(event)">
+    <div class="modal" style="width:min(560px,95vw)">
+      <div class="modal-header">
+        <h2>إدارة المصادر</h2>
+        <button class="modal-close" onclick="closeSourceModal()">✕</button>
+      </div>
+      <div class="modal-body" style="max-height:70vh;overflow-y:auto">
+        <div id="savedSourcesList"></div>
+        <div class="src-tabs">
+          <button class="src-tab active" id="tabXtream" onclick="switchSrcTab('xtream')">📡 Xtream Code</button>
+          <button class="src-tab" id="tabM3u" onclick="switchSrcTab('m3u')">📋 ملف M3U</button>
+        </div>
+        <!-- Xtream Form -->
+        <div id="xtreamForm">
+          <div class="form-group"><label>رابط السيرفر</label><input type="url" id="xtreamHost"
+              placeholder="http://server:port" autocomplete="off" /></div>
+          <div class="form-group"><label>اسم المستخدم</label><input type="text" id="xtreamUser" placeholder="username"
+              autocomplete="off" /></div>
+          <div class="form-group"><label>كلمة المرور</label><input type="password" id="xtreamPass"
+              placeholder="password" autocomplete="off" /></div>
+          <div class="form-group"><label>اسم للعرض</label><input type="text" id="xtreamName"
+              placeholder="مثال: سيرفر الرياضة" /></div>
+          <button class="btn-save" style="width:100%;margin-top:4px" id="xtreamAddBtn" onclick="addXtreamSource()">تحميل
+            وإضافة</button>
+        </div>
+        <!-- M3U Form -->
+        <div id="m3uForm" class="hidden">
+          <div class="form-group"><label>اسم المصدر</label><input type="text" id="m3uName" placeholder="مثال: قنواتي" />
+          </div>
+          <div class="m3u-type-tabs">
+            <button class="m3u-tab active" id="m3uTabUrl" onclick="switchM3UTab('url')">🔗 رابط URL</button>
+            <button class="m3u-tab" id="m3uTabFile" onclick="switchM3UTab('file')">📁 رفع ملف</button>
+          </div>
+          <div id="m3uUrlArea">
+            <div class="form-group"><label>رابط M3U</label><input type="url" id="m3uUrl" placeholder="http://..." />
+            </div>
+          </div>
+          <div id="m3uFileArea" class="hidden">
+            <div class="form-group"><label>ملف M3U</label><input type="file" id="m3uFileInput" accept=".m3u,.m3u8,.txt"
+                onchange="handleM3UFile(event)" style="color:var(--text)" /></div>
+          </div>
+          <button class="btn-save" style="width:100%;margin-top:4px" id="m3uAddBtn" onclick="addM3USource()">إضافة
+            المصدر</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== IPTV PLAYER OVERLAY ===== -->
+  <div id="iptvPlayerOverlay" class="hidden">
+    <div id="playerTopBar">
+      <button class="player-back" onclick="closeIPTVPlayer()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M19 12H5M12 5l-7 7 7 7" />
+        </svg>
+        رجوع
+      </button>
+      <div id="playerChInfo">
+        <img id="playerChLogo" src="" alt="" />
+        <div>
+          <div id="playerChName"></div>
+          <span class="live-badge">● LIVE</span>
+        </div>
+      </div>
+      <button class="player-fs" onclick="toggleIPTVFs()" title="ملء الشاشة">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3" />
+        </svg>
+      </button>
+    </div>
+    <div id="playerBody">
+      <video id="iptvVideo" controls autoplay playsinline></video>
+      <div id="playerErrMsg" class="hidden">
+        <span>⚠️</span>
+        <p>تعذّر تشغيل هذه القناة. تأكد من صحة الرابط أو جرّب قناة أخرى.</p>
+        <button class="ctrl-btn" onclick="closeIPTVPlayer()">رجوع</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+  <script src="iptv.js"></script>
+</body>
+
+</html>
