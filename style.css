@@ -25,10 +25,12 @@
 html,
 body {
   height: 100%;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto; /* Enable global scrolling */
   font-family: 'Cairo', sans-serif;
   background: var(--bg);
   color: var(--text);
+  -webkit-overflow-scrolling: touch; /* Smooth iOS scroll */
 }
 
 .hidden {
@@ -294,20 +296,24 @@ body {
 }
 
 /* ===== WELCOME SCREEN ===== */
+/* Specific fix for welcomeScreen to allow scrolling */
 #welcomeScreen {
-  position: fixed;
-  inset: 0;
-  top: var(--bar-h);
+  position: relative; /* Change from fixed to relative to allow natural scrolling */
+  min-height: calc(100vh - var(--bar-h));
+  margin-top: var(--bar-h);
   display: flex;
-  align-items: center;
+  align-items: flex-start; /* Start from top */
   justify-content: center;
-  overflow: hidden;
+  overflow-y: visible;
+  padding-bottom: 40px;
 }
 
 .welcome-content {
   text-align: center;
   z-index: 2;
   padding: 20px;
+  width: 100%;
+  max-width: 1200px;
   animation: fadeUp 0.6s ease both;
 }
 
