@@ -602,16 +602,52 @@ function renderWelcomeGrid() {
   const grid = document.getElementById('welcomeIconsGrid');
   grid.innerHTML = '';
 
-  const filtered = _currentCategory === 'all' ? shortcuts : shortcuts.filter(s => s.categoryId === _currentCategory);
+  if (_currentCategory === 'all') {
+    // Show all categories as Folders first
+    categories.forEach(cat => {
+      const item = document.createElement('div');
+      item.className = 'welcome-icon-item folder-item';
+      item.title = cat.name;
+      
+      const iconColor = cat.id === 'favorites_folder' ? '#e50914' : '#4a4a6a';
+      item.innerHTML = `
+        <div class="icon-fallback folder-icon" style="width:52px;height:52px;border-radius:12px;background:${iconColor};font-size:24px;">📁</div>
+        <span>${escHtml(cat.name)}</span>
+      `;
+      item.addEventListener('click', () => selectCategory(cat.id));
+      grid.appendChild(item);
+    });
+  } else {
+    // Inside a specific category
+    // 1. Show a "Back" button to go to 'all'
+    const backItem = document.createElement('div');
+    backItem.className = 'welcome-icon-item back-item';
+    backItem.title = 'العودة للمجلدات';
+    backItem.innerHTML = `
+      <div class="icon-fallback" style="width:52px;height:52px;border-radius:12px;background:rgba(255,255,255,0.1);font-size:24px;">🔙</div>
+      <span>رجوع</span>
+    `;
+    backItem.addEventListener('click', () => selectCategory('all'));
+    grid.appendChild(backItem);
 
-  filtered.forEach(s => {
-    const item = document.createElement('div');
-    item.className = 'welcome-icon-item';
-    item.title = s.name;
-    item.innerHTML = buildIconImg(s, 52) + `<span>${escHtml(s.name)}</span>`;
-    item.addEventListener('click', () => openSite(s));
-    grid.appendChild(item);
-  });
+    // 2. Show shortcuts in this category
+    const filtered = shortcuts.filter(s => s.categoryId === _currentCategory);
+    filtered.forEach(s => {
+      const item = document.createElement('div');
+      item.className = 'welcome-icon-item';
+      item.title = s.name;
+      item.innerHTML = buildIconImg(s, 52) + `<span>${escHtml(s.name)}</span>`;
+      item.addEventListener('click', () => openSite(s));
+      grid.appendChild(item);
+    });
+
+    if (filtered.length === 0) {
+      const emptyMsg = document.createElement('div');
+      emptyMsg.style.cssText = 'grid-column: 1/-1; padding: 20px; color: var(--text-muted); font-size: 14px;';
+      emptyMsg.textContent = 'لا توجد مواقع في هذا المجلد بعد.';
+      grid.appendChild(emptyMsg);
+    }
+  }
 }
 
 // ── Build icon image/fallback HTML ────────────────────────────────────
