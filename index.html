@@ -474,8 +474,12 @@
       <video id="iptvVideo" controls autoplay playsinline></video>
       <div id="playerErrMsg" class="hidden">
         <span>⚠️</span>
-        <p>تعذّر تشغيل هذه القناة. تأكد من صحة الرابط أو جرّب قناة أخرى.</p>
-        <button class="ctrl-btn" onclick="closeIPTVPlayer()">رجوع</button>
+        <p id="playerErrText">تعذّر تشغيل هذه القناة. تأكد من صحة الرابط أو جرّب قناة أخرى.</p>
+        <div id="mixedContentHelp" class="hidden" style="margin-top:10px; font-size:12px; background:rgba(255,255,255,0.05); padding:10px; border-radius:8px; border:1px dashed rgba(255,255,255,0.2);">
+          <p style="color:#ff6b6b; margin-bottom:8px;">ملاحظة: المتصفح يمنع تشغيل هذه القناة لأن رابطها غير مشفر (HTTP).</p>
+          <p>لحل المشكلة: اضغط على أيقونة القفل بجانب رابط الموقع ➔ إعدادات الموقع ➔ المحتوى غير الآمن (Insecure Content) ➔ اختر "سماح" (Allow).</p>
+        </div>
+        <button class="ctrl-btn" onclick="closeIPTVPlayer()" style="margin-top:10px">إغلاق</button>
       </div>
     </div>
   </div>

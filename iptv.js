@@ -218,14 +218,31 @@ function _iptvIsAdult(name, category) {
     return false;
 }
 
-// ── Build flat channel list ────────────────────────────
+// ── Logo Handling with HTTPS fallback ──
 function iptvBuild() {
     IPTV.allChannels = [];
+    const isHttpsPage = window.location.protocol === 'https:';
+    
     IPTV.sources.forEach(src => {
         (src.channels || []).forEach(ch => {
             let cat = ch.category || 'غير مصنف';
             if (_iptvIsAdult(ch.name, cat)) cat = '🔞 للكبار فقط';
-            IPTV.allChannels.push({ ...ch, category: cat, _srcId: src.id, _srcName: src.name, _detectedLang: iptvDetectLang(ch) });
+            
+            // Handle Mixed Content for Logos
+            let finalLogo = ch.logo || '';
+            if (isHttpsPage && finalLogo.startsWith('http:')) {
+                // We can't easily upgrade all logos as many don't support HTTPS
+                // but we can at least try or let browser handle it (some will block it)
+            }
+
+            IPTV.allChannels.push({ 
+                ...ch, 
+                logo: finalLogo,
+                category: cat, 
+                _srcId: src.id, 
+                _srcName: src.name, 
+                _detectedLang: iptvDetectLang(ch) 
+            });
         });
     });
     iptvFilter();
@@ -1127,23 +1144,113 @@ async function playSeriesFirstEpisode(ch) {
 function _iptvLoadStream(url) {
     const video = document.getElementById('iptvVideo');
     if (IPTV.hls) { IPTV.hls.destroy(); IPTV.hls = null; }
-    const isM3U8 = url.includes('.m3u8') || url.includes('/live/');
-    if (isM3U8 && typeof Hls !== 'undefined' && Hls.isSupported()) {
-        const hls = new Hls({ enableWorker: true, lowLatencyMode: true, maxBufferLength: 10 });
-        hls.loadSource(url);
-        hls.attachMedia(video);
-        hls.on(Hls.Events.MANIFEST_PARSED, () => video.play().catch(() => { }));
-        hls.on(Hls.Events.ERROR, (_e, d) => { if (d.fatal) _iptvShowErr(); });
-        IPTV.hls = hls;
+    
+    // ── Mixed Content Handling ──
+    // If the page is HTTPS, browsers block HTTP requests.
+    // We try to upgrade http:// to https:// if possible.
+    let streamUrl = url;
+    const isHttpsPage = window.location.protocol === 'https:';
+    if (isHttpsPage && streamUrl.startsWith('http:')) {
+        // Only try to upgrade if it's not a direct IP (most IPs don't have SSL)
+        const isIP = /http:\/\/(\d{1,3}\.){3}\d{1,3}/.test(streamUrl);
+        if (!isIP) {
+            streamUrl = streamUrl.replace('http:', 'https:');
+            console.log("Upgraded stream to HTTPS for secure page context:", streamUrl);
+        } else {
+            console.warn("Stream is on an IP address with HTTP. This may be blocked by browser on HTTPS page.");
+            if (typeof showToast === 'function') {
+                showToast('⚠️ تنبيه: القناة تعمل برابط غير آمن (HTTP) وقد يمنع المتصفح تشغيلها على GitHub');
+            }
+        }
+    }
+
+    // Clear video element before loading new source
+    video.pause();
+    video.removeAttribute('src');
+    video.load();
+
+    const isHls = streamUrl.includes('.m3u8') || streamUrl.includes('/live/') || streamUrl.includes('type=m3u8');
+    
+    if (isHls && typeof Hls !== 'undefined') {
+        if (Hls.isSupported()) {
+            const hls = new Hls({ 
+                enableWorker: true, 
+                lowLatencyMode: true, 
+                maxBufferLength: 30,
+                maxMaxBufferLength: 60,
+                startLevel: -1,
+                abrEwmaDefaultEstimate: 500000,
+                // Add more robust error handling
+                xhrSetup: function(xhr, url) {
+                    xhr.withCredentials = false; // Important for some IPTV providers
+                }
+            });
+            
+            hls.on(Hls.Events.ERROR, function (event, data) {
+                if (data.fatal) {
+                    switch (data.type) {
+                        case Hls.ErrorTypes.NETWORK_ERROR:
+                            console.error("Fatal network error encountered, try to recover");
+                            // If initial load failed and we upgraded to HTTPS, maybe fallback to HTTP if possible?
+                            // But browsers will block it anyway.
+                            hls.startLoad();
+                            break;
+                        case Hls.ErrorTypes.MEDIA_ERROR:
+                            console.error("Fatal media error encountered, try to recover");
+                            hls.recoverMediaError();
+                            break;
+                        default:
+                            console.error("Fatal error, cannot recover");
+                            hls.destroy();
+                            _iptvShowErr();
+                            break;
+                    }
+                }
+            });
+
+            hls.loadSource(streamUrl);
+            hls.attachMedia(video);
+            hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                video.play().catch(e => {
+                    console.warn("Autoplay blocked or failed:", e);
+                });
+            });
+            IPTV.hls = hls;
+        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+            // Native HLS support (Safari/iOS)
+            video.src = streamUrl;
+            video.addEventListener('loadedmetadata', () => {
+                video.play().catch(e => console.warn("Native HLS play failed:", e));
+            });
+            video.onerror = _iptvShowErr;
+        } else {
+            _iptvShowErr("المتصفح لا يدعم تشغيل HLS");
+        }
     } else {
-        video.src = url;
-        video.play().catch(() => { });
+        // Direct stream (MP4/MKV etc)
+        video.src = streamUrl;
+        video.play().catch(e => console.warn("Direct play failed:", e));
         video.onerror = _iptvShowErr;
     }
 }
 
-function _iptvShowErr() {
-    document.getElementById('playerErrMsg').classList.remove('hidden');
+function _iptvShowErr(customMsg, isMixedContent) {
+    const errPanel = document.getElementById('playerErrMsg');
+    const errText = document.getElementById('playerErrText');
+    const mixedHelp = document.getElementById('mixedContentHelp');
+    
+    if (customMsg && errText) errText.textContent = customMsg;
+    else if (errText) errText.textContent = "تعذّر تشغيل هذه القناة. تأكد من صحة الرابط أو جرّب قناة أخرى.";
+    
+    if (mixedHelp) {
+        if (isMixedContent || (window.location.protocol === 'https:' && IPTV.currentCh && IPTV.currentCh.url.startsWith('http:'))) {
+            mixedHelp.classList.remove('hidden');
+        } else {
+            mixedHelp.classList.add('hidden');
+        }
+    }
+    
+    errPanel.classList.remove('hidden');
     document.getElementById('iptvVideo').style.display = 'none';
 }
 
@@ -1153,6 +1260,8 @@ function closeIPTVPlayer() {
     if (IPTV.hls) { IPTV.hls.destroy(); IPTV.hls = null; }
     document.getElementById('iptvPlayerOverlay').classList.add('hidden');
     document.getElementById('playerErrMsg').classList.add('hidden');
+    const mixedHelp = document.getElementById('mixedContentHelp');
+    if (mixedHelp) mixedHelp.classList.add('hidden');
     IPTV.currentCh = null;
 }
 
