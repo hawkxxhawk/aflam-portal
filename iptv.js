@@ -152,10 +152,14 @@ async function iptvInit() {
     }
 
     let idbSources = await IPTV_DB.get('rm_iptv');
-    if (!idbSources) {
+    if (!idbSources || (Array.isArray(idbSources) && idbSources.length === 0)) {
         try { 
             const ls = localStorage.getItem('rm_iptv');
-            idbSources = ls && ls !== 'USE_IDB' ? JSON.parse(ls) : null; 
+            if (ls && ls !== 'USE_IDB') {
+                idbSources = JSON.parse(ls);
+            } else {
+                idbSources = null;
+            }
         } catch { idbSources = null; }
     }
     

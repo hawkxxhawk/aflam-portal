@@ -359,10 +359,34 @@ body {
 
 #welcomeIconsGrid {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap; /* No wrapping to allow horizontal scroll */
   gap: 16px;
-  justify-content: center;
-  max-width: 700px;
+  justify-content: flex-start; /* Start from left to scroll right */
+  max-width: 95vw; /* Almost full viewport width */
+  overflow-x: auto; /* Enable horizontal scroll */
+  padding: 10px 10px 24px; /* Space for scrollbar and shadow */
+  scrollbar-width: thin; /* Firefox */
+  -webkit-overflow-scrolling: touch; /* Smooth iOS scroll */
+  scroll-snap-type: x mandatory; /* Snap to icons */
+}
+
+/* Scroll snap for icons */
+.welcome-icon-item {
+  scroll-snap-align: center;
+  flex-shrink: 0; /* Don't shrink to fit */
+}
+
+/* Custom scrollbar for horizontal scroll */
+#welcomeIconsGrid::-webkit-scrollbar {
+  height: 6px;
+}
+#welcomeIconsGrid::-webkit-scrollbar-thumb {
+  background: rgba(229, 9, 20, 0.3);
+  border-radius: 10px;
+}
+#welcomeIconsGrid::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
 }
 
 /* Welcome grid item */
