@@ -161,48 +161,59 @@ async function exportFavoritesOnly() {
 
 async function initApp() {
   try {
-    // Ensure "المفضلة" category exists
-    const hasFavCat = categories.some(c => c.id === 'favorites_folder');
-    if (!hasFavCat) {
+    // 1. Load system categories first to ensure "المفضلة" exists
+    if (!categories.some(c => c.id === 'favorites_folder')) {
       categories.push({ id: 'favorites_folder', name: 'المفضلة', isSystem: true });
     }
 
-    // 1. Try to load from IndexedDB first
+    // 2. Load from IndexedDB
     let dbShortcuts = [];
     if (typeof IPTV_DB !== 'undefined') {
       dbShortcuts = await IPTV_DB.get('rm_shortcuts') || [];
       const dbCategories = await IPTV_DB.get('rm_categories');
       if (dbShortcuts.length > 0) {
         shortcuts = dbShortcuts;
-        categories = dbCategories || categories;
+        // Merge categories carefully
+        if (dbCategories && Array.isArray(dbCategories)) {
+          dbCategories.forEach(c => {
+            if (!categories.some(exist => exist.id === c.id)) categories.push(c);
+          });
+        }
       }
     }
 
-    // 2. Load external favorites from favourit.json
+    // 3. Load external favorites from favourit.json
     const externalFavs = await loadFavoritesFromFile();
-    
-    // Merge strategy: Remove existing shortcuts with category 'favorites_folder' 
-    // and replace them with the ones from the file to ensure it's "updated from file independently"
-    shortcuts = shortcuts.filter(s => s.categoryId !== 'favorites_folder');
-    shortcuts = [...shortcuts, ...externalFavs];
+    if (externalFavs.length > 0) {
+      shortcuts = shortcuts.filter(s => s.categoryId !== 'favorites_folder');
+      shortcuts = [...shortcuts, ...externalFavs];
+    }
 
-    // 3. Fallback to localStorage (legacy) if still empty
+    // 4. Fallback to localStorage (legacy)
     if (shortcuts.length === 0) {
       const lsData = localStorage.getItem('rm_shortcuts');
+      const lsCat = localStorage.getItem('rm_categories');
       if (lsData) {
         try {
           const parsed = JSON.parse(lsData);
-          if (Array.isArray(parsed) && parsed.length > 0) shortcuts = parsed;
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            shortcuts = parsed;
+            const parsedCat = JSON.parse(lsCat);
+            if (Array.isArray(parsedCat)) {
+              parsedCat.forEach(c => {
+                if (!categories.some(exist => exist.id === c.id)) categories.push(c);
+              });
+            }
+          }
         } catch (e) {}
       }
     }
 
-    // 4. If STILL empty, load from chunks
+    // 5. Load from chunks if still empty
     if (shortcuts.length === 0) {
       const disk = await loadDataFromChunks();
       if (disk) {
         shortcuts = disk.shortcuts || DEFAULT_SHORTCUTS.map(s => ({ ...s }));
-        // Re-merge external favs if they exist
         if (externalFavs.length > 0) {
           shortcuts = shortcuts.filter(s => s.categoryId !== 'favorites_folder');
           shortcuts = [...shortcuts, ...externalFavs];
@@ -210,12 +221,21 @@ async function initApp() {
       }
     }
 
-    // Ensure at least defaults if all fails
-    if (shortcuts.length === 0) {
-      shortcuts = DEFAULT_SHORTCUTS.map(s => ({ ...s }));
-    }
+    // Final safety
+    if (shortcuts.length === 0) shortcuts = DEFAULT_SHORTCUTS.map(s => ({ ...s }));
+    if (!categories.some(c => c.id === 'general')) categories.push({ id: 'general', name: 'عام' });
 
-    // Ensure legacy shortcuts have a category
+    // Clean up categories (remove duplicates just in case)
+    const uniqueCats = [];
+    const catMap = new Map();
+    categories.forEach(c => {
+      if (!catMap.has(c.id)) {
+        catMap.set(c.id, true);
+        uniqueCats.push(c);
+      }
+    });
+    categories = uniqueCats;
+
     shortcuts.forEach(s => { if (!s.categoryId) s.categoryId = 'general'; });
 
     renderCategorySelector();

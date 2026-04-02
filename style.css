@@ -1009,12 +1009,16 @@ body.app-mode #viewerWrapper {
     top: auto;
     width: 100%;
     border-radius: 24px 24px 0 0;
-    padding: 20px;
+    padding: 10px 10px 30px; /* More bottom padding for mobile safe area */
     background: #12121e;
-    box-shadow: 0 -10px 30px rgba(0,0,0,0.8);
+    box-shadow: 0 -10px 40px rgba(0,0,0,0.9);
     transform: translateY(100%);
     animation: slideUp 0.3s forwards;
-    z-index: 1000;
+    z-index: 2000;
+    max-height: 80vh; /* Don't cover entire screen */
+    overflow-y: auto; /* Allow scrolling within the menu */
+    display: flex;
+    flex-direction: column;
   }
 
   @keyframes slideUp {
@@ -1023,9 +1027,29 @@ body.app-mode #viewerWrapper {
 
   .dropdown-menu button, 
   .dropdown-item {
-    padding: 16px;
+    padding: 18px 20px;
     font-size: 16px;
     border-bottom: 1px solid rgba(255,255,255,0.05);
+    text-align: right;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--text);
+  }
+
+  .dropdown-menu button:last-child {
+    border-bottom: none;
+  }
+
+  /* Specific fix for category menu scroll */
+  #categorySelectMenu {
+    padding-top: 15px;
+  }
+
+  #categorySelectMenu hr.dropdown-divider {
+    margin: 10px 0;
+    border-color: rgba(255,255,255,0.1);
   }
 
   /* Modals */
