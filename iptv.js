@@ -155,7 +155,7 @@ async function iptvInit() {
     if (!idbSources || (Array.isArray(idbSources) && idbSources.length === 0)) {
         try { 
             const ls = localStorage.getItem('rm_iptv');
-            if (ls && ls !== 'USE_IDB') {
+            if (ls && ls !== 'USE_IDB' && ls.startsWith('[')) {
                 idbSources = JSON.parse(ls);
             } else {
                 idbSources = null;
@@ -167,7 +167,7 @@ async function iptvInit() {
         IPTV.sources = idbSources;
     } else if (disk && disk.iptv_sources && disk.iptv_sources.length > 0) {
         IPTV.sources = disk.iptv_sources;
-        iptvSave();
+        await iptvSave();
     } else {
         IPTV.sources = [];
     }
@@ -177,13 +177,21 @@ async function iptvInit() {
 
 // ── Persist ────────────────────────────────────────────
 async function iptvSave() {
-    await IPTV_DB.set('rm_iptv', IPTV.sources);
-    try { localStorage.setItem('rm_iptv', 'USE_IDB'); } catch (_) { }
+    if (typeof IPTV_DB !== 'undefined') {
+        await IPTV_DB.set('rm_iptv', IPTV.sources);
+        try { localStorage.setItem('rm_iptv', 'USE_IDB'); } catch (_) { }
+    } else {
+        try { localStorage.setItem('rm_iptv', JSON.stringify(IPTV.sources)); } catch (_) { }
+    }
 }
 
 async function iptvSavePlaylists() {
-    await IPTV_DB.set('rm_iptv_playlists', IPTV.playlists);
-    try { localStorage.setItem('rm_iptv_playlists', 'USE_IDB'); } catch (_) { }
+    if (typeof IPTV_DB !== 'undefined') {
+        await IPTV_DB.set('rm_iptv_playlists', IPTV.playlists);
+        try { localStorage.setItem('rm_iptv_playlists', 'USE_IDB'); } catch (_) { }
+    } else {
+        try { localStorage.setItem('rm_iptv_playlists', JSON.stringify(IPTV.playlists)); } catch (_) { }
+    }
 }
 
 // ── Adult content detection helper ───────────────────

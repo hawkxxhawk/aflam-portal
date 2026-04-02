@@ -79,7 +79,10 @@ let ctxTargetId = null;
 let currentIconImage = null;
 
 // ── Data loading strategy ─────────────────────────────────────────────
-// Priority: localStorage (newest user changes) > database_chunks/dataX.json (bundled seed)
+// Priority: IndexedDB (newest user changes) > database_chunks/dataX.json (bundled seed)
+
+// Helper to check if we are on a mobile device
+const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
 async function loadDataFromChunks() {
   let combinedStr = '';
@@ -95,12 +98,11 @@ async function loadDataFromChunks() {
           combinedStr += text;
           i++;
           success = true;
+          if (i % 2 === 0) showToast(`⏳ جاري تحميل الجزء ${i}...`);
         } else {
-          // Stop if file not found (404) or other error
           break;
         }
       } catch (e) {
-        // Stop on fetch error
         break;
       }
     }
@@ -121,62 +123,91 @@ async function loadDataFromChunks() {
 }
 
 async function initApp() {
-  const lsData = localStorage.getItem('rm_shortcuts');
-  const lsCat = localStorage.getItem('rm_categories');
-
-  // Check if we have data in localStorage.
-  let hasLocalData = false;
-  if (lsData) {
-    try {
-      const parsed = JSON.parse(lsData);
-      if (Array.isArray(parsed) && parsed.length > 0) hasLocalData = true;
-    } catch (e) { hasLocalData = false; }
-  }
-
-  if (hasLocalData) {
-    try { shortcuts = JSON.parse(lsData); } catch { shortcuts = []; }
-    try { categories = JSON.parse(lsCat) || [{ id: 'general', name: 'عام' }]; } catch { categories = [{ id: 'general', name: 'عام' }]; }
-  } else {
-    // Try to load from database_chunks/ folder
-    const disk = await loadDataFromChunks();
-    
-    if (disk && (disk.shortcuts || disk.iptv_sources)) {
-      shortcuts = disk.shortcuts || DEFAULT_SHORTCUTS.map(s => ({ ...s }));
-      categories = disk.categories || [{ id: 'general', name: 'عام' }];
+  try {
+    // 1. Try to load from IndexedDB first (Preferred for all platforms to avoid QuotaExceededError)
+    let disk = null;
+    if (typeof IPTV_DB !== 'undefined') {
+      const dbShortcuts = await IPTV_DB.get('rm_shortcuts');
+      const dbCategories = await IPTV_DB.get('rm_categories');
       
-      // Load IPTV data if present in the chunked data
-      if (disk.iptv_sources) {
-        // ALWAYS use IndexedDB for large data to avoid QuotaExceededError
-        if (typeof IPTV_DB !== 'undefined') {
+      if (dbShortcuts && Array.isArray(dbShortcuts) && dbShortcuts.length > 0) {
+        shortcuts = dbShortcuts;
+        categories = dbCategories || [{ id: 'general', name: 'عام' }];
+      }
+    }
+
+    // 2. Fallback to localStorage (legacy)
+    if (shortcuts.length === 0) {
+      const lsData = localStorage.getItem('rm_shortcuts');
+      const lsCat = localStorage.getItem('rm_categories');
+      if (lsData) {
+        try {
+          const parsed = JSON.parse(lsData);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            shortcuts = parsed;
+            categories = JSON.parse(lsCat) || [{ id: 'general', name: 'عام' }];
+          }
+        } catch (e) {}
+      }
+    }
+
+    // 3. If still no data, load from chunks (First time or reset)
+    if (shortcuts.length === 0) {
+      disk = await loadDataFromChunks();
+      if (disk) {
+        shortcuts = disk.shortcuts || DEFAULT_SHORTCUTS.map(s => ({ ...s }));
+        categories = disk.categories || [{ id: 'general', name: 'عام' }];
+        
+        // Handle IPTV data from chunks
+        if (disk.iptv_sources && typeof IPTV_DB !== 'undefined') {
           await IPTV_DB.set('rm_iptv', disk.iptv_sources);
           if (disk.iptv_playlists) await IPTV_DB.set('rm_iptv_playlists', disk.iptv_playlists);
           localStorage.setItem('rm_iptv', 'USE_IDB');
           localStorage.setItem('rm_iptv_playlists', 'USE_IDB');
-        } else {
-          // Fallback if IndexedDB fails (not ideal for large data)
-          try { localStorage.setItem('rm_iptv', JSON.stringify(disk.iptv_sources)); } catch(e) {}
+          
+          if (disk.iptv_favs) localStorage.setItem('rm_iptv_favs', JSON.stringify(disk.iptv_favs));
+          if (disk.iptv_customCatOrder) localStorage.setItem('rm_iptv_cat_order', JSON.stringify(disk.iptv_customCatOrder));
+          if (disk.iptv_playerChoice) localStorage.setItem('rm_iptv_player', disk.iptv_playerChoice);
         }
-
-        if (disk.iptv_favs) localStorage.setItem('rm_iptv_favs', JSON.stringify(disk.iptv_favs));
-        if (disk.iptv_customCatOrder) localStorage.setItem('rm_iptv_cat_order', JSON.stringify(disk.iptv_customCatOrder));
-        if (disk.iptv_playerChoice) localStorage.setItem('rm_iptv_player', disk.iptv_playerChoice);
+        await saveShortcuts(); // Save to IDB
+      } else {
+        // Absolute fallback
+        shortcuts = DEFAULT_SHORTCUTS.map(s => ({ ...s }));
+        categories = [{ id: 'general', name: 'عام' }];
+        await saveShortcuts();
       }
-      saveShortcuts(); // Cache to localStorage
-    } else {
-      // Last fallback
+    }
+
+    // Ensure legacy shortcuts have a category
+    shortcuts.forEach(s => { if (!s.categoryId) s.categoryId = 'general'; });
+
+    renderCategorySelector();
+    renderIcons();
+    renderWelcomeGrid();
+
+    // Event listeners
+    setupEventListeners();
+
+    // Hide global loader
+    const loader = document.getElementById('globalLoader');
+    if (loader) {
+      loader.style.opacity = '0';
+      setTimeout(() => loader.remove(), 600);
+    }
+
+  } catch (err) {
+    console.error("Critical Init Error:", err);
+    showToast('⚠️ خطأ في تحميل البيانات. جاري المحاولة مرة أخرى...');
+    // Last ditch effort: Render defaults so screen isn't empty
+    if (shortcuts.length === 0) {
       shortcuts = DEFAULT_SHORTCUTS.map(s => ({ ...s }));
-      categories = [{ id: 'general', name: 'عام' }];
-      saveShortcuts();
+      renderIcons();
+      renderWelcomeGrid();
     }
   }
+}
 
-  // Ensure legacy shortcuts have a category
-  shortcuts.forEach(s => { if (!s.categoryId) s.categoryId = 'general'; });
-
-  renderCategorySelector();
-  renderIcons();
-  renderWelcomeGrid();
-
+function setupEventListeners() {
   document.addEventListener('click', (e) => {
     // Hide context menu
     if (!e.target.closest('.icon-card')) closeContextMenu();
@@ -198,76 +229,78 @@ async function initApp() {
       if (!document.getElementById('manageCategoriesModal').classList.contains('hidden')) closeManageCategoriesModal();
     }
   });
-  document.getElementById('siteColor').addEventListener('input', function () {
-    document.getElementById('colorPreviewText').textContent = this.value;
-  });
+
+  const siteColorInput = document.getElementById('siteColor');
+  if (siteColorInput) {
+    siteColorInput.addEventListener('input', function () {
+      const previewText = document.getElementById('colorPreviewText');
+      if (previewText) previewText.textContent = this.value;
+    });
+  }
 }
 
-window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('load', () => {
   initApp();
-}); // kick off async init after all scripts are ready
+}); // Use 'load' to ensure all assets are ready for mobile
 
 async function forceReloadFromChunks() {
-  showToast('⏳ جاري تحديث البيانات من السيرفر...');
+  showToast('⏳ جاري جلب أحدث البيانات من السيرفر...');
   const disk = await loadDataFromChunks();
   
   if (disk && (disk.shortcuts || disk.iptv_sources)) {
-    // Update main shortcuts and categories
     if (disk.shortcuts) shortcuts = disk.shortcuts;
     if (disk.categories) categories = disk.categories;
     
-    // Ensure legacy shortcuts have a category
     shortcuts.forEach(s => { if (!s.categoryId) s.categoryId = 'general'; });
     
-    saveShortcuts(); // Cache to localStorage
+    // Save to IDB
+    await saveShortcuts();
     
-    // Update IPTV data
-    if (disk.iptv_sources) {
-      // ALWAYS use IndexedDB for large data to avoid QuotaExceededError
-      if (typeof IPTV_DB !== 'undefined') {
-        await IPTV_DB.set('rm_iptv', disk.iptv_sources);
-        if (disk.iptv_playlists) await IPTV_DB.set('rm_iptv_playlists', disk.iptv_playlists);
-        localStorage.setItem('rm_iptv', 'USE_IDB');
-        localStorage.setItem('rm_iptv_playlists', 'USE_IDB');
-      } else {
-        try { localStorage.setItem('rm_iptv', JSON.stringify(disk.iptv_sources)); } catch(e) {}
-      }
+    if (disk.iptv_sources && typeof IPTV_DB !== 'undefined') {
+      await IPTV_DB.set('rm_iptv', disk.iptv_sources);
+      if (disk.iptv_playlists) await IPTV_DB.set('rm_iptv_playlists', disk.iptv_playlists);
+      localStorage.setItem('rm_iptv', 'USE_IDB');
+      localStorage.setItem('rm_iptv_playlists', 'USE_IDB');
 
       if (disk.iptv_favs) localStorage.setItem('rm_iptv_favs', JSON.stringify(disk.iptv_favs));
       if (disk.iptv_customCatOrder) localStorage.setItem('rm_iptv_cat_order', JSON.stringify(disk.iptv_customCatOrder));
       if (disk.iptv_playerChoice) localStorage.setItem('rm_iptv_player', disk.iptv_playerChoice);
       
-      // If IPTV is already initialized, we need to rebuild it
       if (typeof IPTV !== 'undefined') {
         IPTV.sources = disk.iptv_sources;
         if (disk.iptv_favs) IPTV.favorites = disk.iptv_favs;
         if (disk.iptv_playlists) IPTV.playlists = disk.iptv_playlists;
         if (disk.iptv_customCatOrder) IPTV.customCatOrder = disk.iptv_customCatOrder;
         if (disk.iptv_playerChoice) IPTV.playerChoice = disk.iptv_playerChoice;
-        
         if (typeof iptvBuild === 'function') iptvBuild();
       }
     }
     
-    // Refresh UI
     renderCategorySelector();
     renderIcons();
     renderWelcomeGrid();
     
     document.getElementById('settingsMenu').classList.add('hidden');
-    showToast('✅ تم تحديث البيانات بنجاح من السيرفر');
+    showToast('✅ تم تحديث كافة البيانات بنجاح');
   } else {
-    showToast('❌ لم يتم العثور على بيانات جديدة في مجلد database_chunks');
+    showToast('❌ فشل في جلب البيانات. تأكد من اتصالك بالإنترنت');
   }
 }
 
 // ── Persistence ───────────────────────────────────────────────────────
-function loadShortcuts() {
-  try { return JSON.parse(localStorage.getItem('rm_shortcuts') || '[]'); } catch { return []; }
-}
-function saveShortcuts() {
-  localStorage.setItem('rm_shortcuts', JSON.stringify(shortcuts));
-  localStorage.setItem('rm_categories', JSON.stringify(categories));
+async function saveShortcuts() {
+  if (typeof IPTV_DB !== 'undefined') {
+    await IPTV_DB.set('rm_shortcuts', shortcuts);
+    await IPTV_DB.set('rm_categories', categories);
+  }
+  // Keep a lightweight version in localStorage for quick check, but without large images
+  try {
+    const lightShortcuts = shortcuts.map(s => ({ ...s, image: s.image ? 'IDB_STORED' : null }));
+    localStorage.setItem('rm_shortcuts', JSON.stringify(lightShortcuts));
+    localStorage.setItem('rm_categories', JSON.stringify(categories));
+  } catch (e) {
+    console.warn("LocalStorage save failed, relying on IndexedDB only.");
+  }
 }
 
 // ── Export / Import data.json ─────────────────────────────────────────

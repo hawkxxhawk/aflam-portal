@@ -12,6 +12,8 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="theme-color" content="#0a0a14" />
+  <meta name="apple-touch-fullscreen" content="yes" />
+  <meta name="HandheldFriendly" content="true" />
   <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3658/3658959.png" />
   
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -24,6 +26,13 @@
 </head>
 
 <body>
+  <!-- Global Loading Overlay -->
+  <div id="globalLoader"
+    style="position:fixed;inset:0;background:#0a0a14;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;transition:opacity 0.5s;">
+    <div style="width:50px;height:50px;border:4px solid rgba(255,255,255,0.1);border-top-color:#e50914;border-radius:50%;animation:spin 1s linear infinite;"></div>
+    <div style="color:#fff;font-family:Cairo,sans-serif;font-weight:700;font-size:18px;">جاري تحميل البوابة...</div>
+  </div>
+
   <div id="topBarHoverArea"></div>
 
   <!-- ===== TOP BAR ===== -->
