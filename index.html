@@ -41,16 +41,12 @@
       <button id="homeBtn" class="ctrl-btn" title="الصفحة الرئيسية" onclick="goHome()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z" />
-          <path d="M9 21V12h6v9" />
         </svg>
-        <span>الرئيسية</span>
       </button>
-      <button id="backBtn" class="ctrl-btn hidden" title="الرجوع للخلف" onclick="goBack()"
-        style="background:rgba(255,255,255,0.15)">
+      <button id="backBtn" class="ctrl-btn" title="رجوع" onclick="goBackView()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="15 18 9 12 15 6"></polyline>
+          <path d="M19 12H5M12 19l-7-7 7-7" />
         </svg>
-        <span>رجوع</span>
       </button>
       <div id="currentSiteLabel"></div>
       <button id="iptvBtn" class="ctrl-btn" onclick="openIPTV()">
@@ -145,6 +141,15 @@
             إدارة المواقع
           </button>
 
+          <div class="dropdown-header">إعدادات الفتح الافتراضية</div>
+          <button id="globalBrowserModeBtn" onclick="toggleGlobalBrowserMode()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
+              <polyline points="15 3 21 3 21 9" />
+              <line x1="10" y1="14" x2="21" y2="3" />
+            </svg>
+            <span id="globalModeText">فتح جميع المواقع في المتصفح</span>
+          </button>
           <div class="dropdown-header">إدارة البيانات</div>
           <button onclick="forceReloadFromChunks()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -166,6 +171,12 @@
               <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" />
             </svg>
             تصدير المفضلة (favourit.json)
+          </button>
+          <button onclick="exportFavorites2Only()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" />
+            </svg>
+            تصدير المفضلة 2 (favourit2.json)
           </button>
           <label class="dropdown-item file-label">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -224,7 +235,7 @@
   </div>
 
   <!-- ===== ADD / EDIT MODAL ===== -->
-  <div id="modalOverlay" class="modal-overlay hidden" onclick="handleOverlayClick(event)">
+  <div id="modalOverlay" class="modal-overlay hidden">
     <div class="modal" id="modal" role="dialog" aria-modal="true">
       <div class="modal-header">
         <h2 id="modalTitle">إضافة موقع جديد</h2>
@@ -268,6 +279,13 @@
           <div class="color-row">
             <input type="color" id="siteColor" value="#1a1a2e" />
             <span id="colorPreviewText">#1a1a2e</span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="siteBgImage">رابط صورة الخلفية (اختياري)</label>
+          <input type="url" id="siteBgImage" placeholder="https://..." autocomplete="off" />
+          <small style="color: var(--text-muted); font-size: 11px; margin-top: 4px; display: block;">يمكنك إدخال رابط صورة لتكون خلفية للعنصر</small>
           </div>
         </div>
       </div>
@@ -367,7 +385,9 @@
           <div style="flex:1"></div>
           <select id="iptvPlayerSelect" class="ctrl-btn" style="padding:4px 8px;font-family:'Cairo';background:var(--bg2);color:var(--text);border:1px solid var(--glass-border);border-radius:6px;cursor:pointer;" onchange="iptvChangePlayer(this.value)">
             <option value="browser">🌐 المشغل المدمج (Browser)</option>
-            <option value="external">📱 مشغل النظام الخارجي (أندرويد)</option>
+            <option value="external">📱 مشغل النظام الافتراضي (أندرويد)</option>
+            <option value="vlc_android">🧡 VLC Player (أندرويد)</option>
+            <option value="mx_android">💚 MX Player (أندرويد)</option>
             <option value="vlc">🟠 VLC Player (ويندوز)</option>
             <option value="potplayer">🟡 PotPlayer (ويندوز)</option>
           </select>

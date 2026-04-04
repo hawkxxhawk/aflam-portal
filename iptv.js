@@ -1077,11 +1077,23 @@ function iptvPlay(idx) {
 
     if (IPTV.playerChoice === 'vlc') {
         window.open('vlc://' + ch.url, '_self');
-        if (typeof showToast === 'function') showToast(`🟠 جاري فتح ${ch.name} في VLC...`);
+        if (typeof showToast === 'function') showToast(`🟠 جاري فتح ${ch.name} في VLC (ويندوز)...`);
+        return;
+    } else if (IPTV.playerChoice === 'vlc_android') {
+        // VLC Android Intent
+        const vlcUrl = `intent:${ch.url}#Intent;package=org.videolan.vlc;type=video/*;S.title=${encodeURIComponent(ch.name)};end`;
+        window.location.href = vlcUrl;
+        if (typeof showToast === 'function') showToast(`🧡 جاري فتح ${ch.name} في VLC (أندرويد)...`);
+        return;
+    } else if (IPTV.playerChoice === 'mx_android') {
+        // MX Player Android Intent
+        const mxUrl = `intent:${ch.url}#Intent;package=com.mxtech.videoplayer.ad;S.title=${encodeURIComponent(ch.name)};end`;
+        window.location.href = mxUrl;
+        if (typeof showToast === 'function') showToast(`💚 جاري فتح ${ch.name} في MX Player (أندرويد)...`);
         return;
     } else if (IPTV.playerChoice === 'potplayer') {
         window.open('potplayer://' + ch.url, '_self');
-        if (typeof showToast === 'function') showToast(`🟡 جاري فتح ${ch.name} في PotPlayer...`);
+        if (typeof showToast === 'function') showToast(`🟡 جاري فتح ${ch.name} في PotPlayer (ويندوز)...`);
         return;
     } else if (IPTV.playerChoice === 'external') {
         // Direct link to trigger system player (Best for Mobile)
@@ -1089,7 +1101,7 @@ function iptvPlay(idx) {
         a.href = ch.url;
         a.target = '_blank';
         a.click();
-        if (typeof showToast === 'function') showToast(`🔵 جاري فتح ${ch.name} في المشغل الخارجي...`);
+        if (typeof showToast === 'function') showToast(`🔵 جاري فتح ${ch.name} في المشغل الافتراضي...`);
         return;
     }
 

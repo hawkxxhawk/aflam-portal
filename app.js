@@ -74,6 +74,7 @@ const DEFAULT_SHORTCUTS = [
 let shortcuts = [];
 let categories = [{ id: 'general', name: 'عام' }];
 let _currentCategory = 'all';
+let _navigationStack = ['all']; // Track category history for back button
 let editingId = null;
 let ctxTargetId = null;
 let currentIconImage = null;
@@ -129,13 +130,50 @@ async function loadFavoritesFromFile() {
     if (res.ok) {
       const favs = await res.json();
       if (Array.isArray(favs)) {
-        // Tag them with the special category ID
         return favs.map(f => ({ ...f, categoryId: 'favorites_folder', isExternalFav: true }));
       }
     }
-  } catch (e) {
-    console.warn("favourit.json not found or invalid.");
-  }
+  } catch (e) { console.warn("favourit.json not found."); }
+  return [];
+}
+
+async function loadFavoritesFromChunks() {
+  let favs1 = [];
+  let favs2 = [];
+
+  try {
+    const fav1Res = await fetch('./database_chunks/favourit.json?_=' + Date.now());
+    if (fav1Res.ok) {
+      const fav1Data = await fav1Res.json();
+      if (Array.isArray(fav1Data)) {
+        favs1 = fav1Data.map(f => ({ ...f, categoryId: 'favorites_folder', isExternalFav: true }));
+      }
+    }
+  } catch (e) { console.warn("Failed to load favourit.json from chunks:", e); }
+
+  try {
+    const fav2Res = await fetch('./database_chunks/favourit2.json?_=' + Date.now());
+    if (fav2Res.ok) {
+      const fav2Data = await fav2Res.json();
+      if (Array.isArray(fav2Data)) {
+        favs2 = fav2Data.map(f => ({ ...f, categoryId: 'favorites_folder_2', isExternalFav: true }));
+      }
+    }
+  } catch (e) { console.warn("Failed to load favourit2.json from chunks:", e); }
+
+  return { favs1, favs2 };
+}
+
+async function loadFavorites2FromFile() {
+  try {
+    const res = await fetch('./favourit2.json?_=' + Date.now());
+    if (res.ok) {
+      const favs = await res.json();
+      if (Array.isArray(favs)) {
+        return favs.map(f => ({ ...f, categoryId: 'favorites_folder_2', isExternalFav: true }));
+      }
+    }
+  } catch (e) { console.warn("favourit2.json not found."); }
   return [];
 }
 
@@ -145,25 +183,38 @@ async function exportFavoritesOnly() {
     showToast('⚠️ لا توجد مواقع في مجلد المفضلة لتصديرها');
     return;
   }
-  
-  // Clean up metadata before export
   const cleanFavs = favs.map(({ isExternalFav, ...rest }) => rest);
-  
   const blob = new Blob([JSON.stringify(cleanFavs, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url;
-  a.download = 'favourit.json';
-  a.click();
+  a.href = url; a.download = 'favourit.json'; a.click();
   URL.revokeObjectURL(url);
   showToast('✅ تم تصدير ملف favourit.json بنجاح');
 }
 
+async function exportFavorites2Only() {
+  const favs = shortcuts.filter(s => s.categoryId === 'favorites_folder_2');
+  if (favs.length === 0) {
+    showToast('⚠️ لا توجد مواقع في مجلد المفضلة 2 لتصديرها');
+    return;
+  }
+  const cleanFavs = favs.map(({ isExternalFav, ...rest }) => rest);
+  const blob = new Blob([JSON.stringify(cleanFavs, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'favourit2.json'; a.click();
+  URL.revokeObjectURL(url);
+  showToast('✅ تم تصدير ملف favourit2.json بنجاح');
+}
+
 async function initApp() {
   try {
-    // 1. Load system categories first to ensure "المفضلة" exists
+    // 1. Load system categories first
     if (!categories.some(c => c.id === 'favorites_folder')) {
       categories.push({ id: 'favorites_folder', name: 'المفضلة', isSystem: true });
+    }
+    if (!categories.some(c => c.id === 'favorites_folder_2')) {
+      categories.push({ id: 'favorites_folder_2', name: 'مفضلة 2', isSystem: true });
     }
 
     // 2. Load from IndexedDB
@@ -173,7 +224,6 @@ async function initApp() {
       const dbCategories = await IPTV_DB.get('rm_categories');
       if (dbShortcuts.length > 0) {
         shortcuts = dbShortcuts;
-        // Merge categories carefully
         if (dbCategories && Array.isArray(dbCategories)) {
           dbCategories.forEach(c => {
             if (!categories.some(exist => exist.id === c.id)) categories.push(c);
@@ -182,12 +232,18 @@ async function initApp() {
       }
     }
 
-    // 3. Load external favorites from favourit.json
-    const externalFavs = await loadFavoritesFromFile();
-    if (externalFavs.length > 0) {
-      shortcuts = shortcuts.filter(s => s.categoryId !== 'favorites_folder');
-      shortcuts = [...shortcuts, ...externalFavs];
-    }
+    // 3. Load external favorites from files — only if the user has no saved favorites in DB
+    //    This prevents wiping user-added favorites on every page reload.
+    const dbHasFavs1 = dbShortcuts.some(s => s.categoryId === 'favorites_folder');
+    const dbHasFavs2 = dbShortcuts.some(s => s.categoryId === 'favorites_folder_2');
+
+    const externalFavs1 = dbHasFavs1 ? [] : await loadFavoritesFromFile();
+    const externalFavs2 = dbHasFavs2 ? [] : await loadFavorites2FromFile();
+
+    // Remove file-sourced favorites only when we are about to replace them with file data
+    if (!dbHasFavs1) shortcuts = shortcuts.filter(s => s.categoryId !== 'favorites_folder');
+    if (!dbHasFavs2) shortcuts = shortcuts.filter(s => s.categoryId !== 'favorites_folder_2');
+    shortcuts = [...shortcuts, ...externalFavs1, ...externalFavs2];
 
     // 4. Fallback to localStorage (legacy)
     if (shortcuts.length === 0) {
@@ -214,10 +270,11 @@ async function initApp() {
       const disk = await loadDataFromChunks();
       if (disk) {
         shortcuts = disk.shortcuts || DEFAULT_SHORTCUTS.map(s => ({ ...s }));
-        if (externalFavs.length > 0) {
-          shortcuts = shortcuts.filter(s => s.categoryId !== 'favorites_folder');
-          shortcuts = [...shortcuts, ...externalFavs];
-        }
+        // Load favorites from database_chunks
+        const chunkFavs = await loadFavoritesFromChunks();
+        // Remove existing favorites and add from chunks
+        shortcuts = shortcuts.filter(s => s.categoryId !== 'favorites_folder' && s.categoryId !== 'favorites_folder_2');
+        shortcuts = [...shortcuts, ...chunkFavs.favs1, ...chunkFavs.favs2];
       }
     }
 
@@ -225,7 +282,7 @@ async function initApp() {
     if (shortcuts.length === 0) shortcuts = DEFAULT_SHORTCUTS.map(s => ({ ...s }));
     if (!categories.some(c => c.id === 'general')) categories.push({ id: 'general', name: 'عام' });
 
-    // Clean up categories (remove duplicates just in case)
+    // Clean up categories
     const uniqueCats = [];
     const catMap = new Map();
     categories.forEach(c => {
@@ -241,7 +298,9 @@ async function initApp() {
     renderCategorySelector();
     renderIcons();
     renderWelcomeGrid();
+    updateBackBtnVisibility();
     setupEventListeners();
+    _updateGlobalModeUI();
 
     const loader = document.getElementById('globalLoader');
     if (loader) {
@@ -293,11 +352,35 @@ window.addEventListener('load', () => {
 async function forceReloadFromChunks() {
   showToast('⏳ جاري جلب أحدث البيانات من السيرفر...');
   const disk = await loadDataFromChunks();
-  
+
   if (disk && (disk.shortcuts || disk.iptv_sources)) {
-    if (disk.shortcuts) shortcuts = disk.shortcuts;
-    if (disk.categories) categories = disk.categories;
-    
+    if (disk.shortcuts) {
+      // Load favorites from database_chunks
+      const chunkFavs = await loadFavoritesFromChunks();
+
+      // ✅ Use favorites from database_chunks instead of user's favorites
+      const diskNonFavs = disk.shortcuts.filter(
+        s => s.categoryId !== 'favorites_folder' && s.categoryId !== 'favorites_folder_2'
+      );
+      shortcuts = [...diskNonFavs, ...chunkFavs.favs1, ...chunkFavs.favs2];
+    }
+
+    if (disk.categories) {
+      // Merge: use disk categories as base, but keep any user-created folders not in disk
+      const diskCatIds = new Set(disk.categories.map(c => c.id));
+      const userOnlyCats = categories.filter(
+        c => !diskCatIds.has(c.id) &&
+             c.id !== 'favorites_folder' &&
+             c.id !== 'favorites_folder_2'
+      );
+      categories = [...disk.categories, ...userOnlyCats];
+      // Always ensure system folders are present
+      if (!categories.some(c => c.id === 'favorites_folder'))
+        categories.unshift({ id: 'favorites_folder', name: 'المفضلة', isSystem: true });
+      if (!categories.some(c => c.id === 'favorites_folder_2'))
+        categories.splice(1, 0, { id: 'favorites_folder_2', name: 'مفضلة 2', isSystem: true });
+    }
+
     shortcuts.forEach(s => { if (!s.categoryId) s.categoryId = 'general'; });
     
     // Save to IDB
@@ -602,6 +685,15 @@ function renderWelcomeGrid() {
   const grid = document.getElementById('welcomeIconsGrid');
   grid.innerHTML = '';
 
+  const isFavView = _currentCategory === 'favorites_folder' || _currentCategory === 'favorites_folder_2';
+
+  // Switch grid layout for favorites
+  if (isFavView) {
+    grid.classList.add('fav-view');
+  } else {
+    grid.classList.remove('fav-view');
+  }
+
   if (_currentCategory === 'all') {
     // Show all categories as Folders first
     categories.forEach(cat => {
@@ -609,7 +701,10 @@ function renderWelcomeGrid() {
       item.className = 'welcome-icon-item folder-item';
       item.title = cat.name;
       
-      const iconColor = cat.id === 'favorites_folder' ? '#e50914' : '#4a4a6a';
+      let iconColor = '#4a4a6a';
+      if (cat.id === 'favorites_folder') iconColor = '#e50914';
+      if (cat.id === 'favorites_folder_2') iconColor = '#ff6b6b';
+
       item.innerHTML = `
         <div class="icon-fallback folder-icon" style="width:52px;height:52px;border-radius:12px;background:${iconColor};font-size:24px;">📁</div>
         <span>${escHtml(cat.name)}</span>
@@ -619,7 +714,6 @@ function renderWelcomeGrid() {
     });
   } else {
     // Inside a specific category
-    // 1. Show a "Back" button to go to 'all'
     const backItem = document.createElement('div');
     backItem.className = 'welcome-icon-item back-item';
     backItem.title = 'العودة للمجلدات';
@@ -627,16 +721,30 @@ function renderWelcomeGrid() {
       <div class="icon-fallback" style="width:52px;height:52px;border-radius:12px;background:rgba(255,255,255,0.1);font-size:24px;">🔙</div>
       <span>رجوع</span>
     `;
-    backItem.addEventListener('click', () => selectCategory('all'));
+    backItem.addEventListener('click', () => goBackView());
     grid.appendChild(backItem);
 
-    // 2. Show shortcuts in this category
     const filtered = shortcuts.filter(s => s.categoryId === _currentCategory);
     filtered.forEach(s => {
       const item = document.createElement('div');
-      item.className = 'welcome-icon-item';
+      
+      if (isFavView) {
+        // Movie Card Style for Favorites with background image
+        item.className = 'welcome-icon-item fav-rectangular-item';
+        const accentColor = s.color || '#e50914';
+        const bgImageStyle = s.bgImage ? `background-image:url('${s.bgImage}');` : '';
+        item.innerHTML = `
+          <div class="fav-rect-frame" style="--item-color:${accentColor};${bgImageStyle}">
+            <div class="fav-rect-overlay"></div>
+            <span class="fav-rect-name">${escHtml(s.name)}</span>
+          </div>
+        `;
+      } else {
+        item.className = 'welcome-icon-item';
+        item.innerHTML = buildIconImg(s, 52) + `<span>${escHtml(s.name)}</span>`;
+      }
+      
       item.title = s.name;
-      item.innerHTML = buildIconImg(s, 52) + `<span>${escHtml(s.name)}</span>`;
       item.addEventListener('click', () => openSite(s));
       grid.appendChild(item);
     });
@@ -652,13 +760,17 @@ function renderWelcomeGrid() {
 
 // ── Build icon image/fallback HTML ────────────────────────────────────
 function buildIconImg(s, size) {
+  const bgStyle = s.bgImage ? `background-image:url('${s.bgImage}');background-size:cover;background-position:center;` : '';
   if (s.image) {
-    return `<img src="${s.image}" alt="${escHtml(s.name)}" style="width:${size}px;height:${size}px;border-radius:${size * 0.23}px;object-fit:cover;" />`;
+    return `<div style="width:${size}px;height:${size}px;border-radius:${size * 0.23}px;overflow:hidden;position:relative;">
+      <img src="${s.image}" alt="${escHtml(s.name)}" style="width:100%;height:100%;object-fit:cover;position:relative;z-index:2;" />
+      ${bgStyle ? `<div style="position:absolute;inset:0;z-index:1;${bgStyle}"></div>` : ''}
+    </div>`;
   }
   // Fallback: colored bubble with first letter/emoji
   const letter = s.emoji || (s.name.charAt(0).toUpperCase());
   const fontSize = Math.round(size * 0.45);
-  return `<div class="icon-fallback" style="width:${size}px;height:${size}px;border-radius:${size * 0.23}px;background:${s.color || '#333'};font-size:${fontSize}px;">${letter}</div>`;
+  return `<div class="icon-fallback" style="width:${size}px;height:${size}px;border-radius:${size * 0.23}px;background:${s.color || '#333'};${bgStyle}font-size:${fontSize}px;">${letter}</div>`;
 }
 
 // ── Current site ref for viewer toolbar ──────────────────────────────
@@ -669,8 +781,8 @@ let _blockDetectTimer = null;
 function openSite(s) {
   _currentSite = s;
 
-  // If user prefers browser mode — open directly
-  if (s.openMode === 'browser') {
+  // If global browser mode is enabled or user prefers browser mode — open directly
+  if (globalBrowserMode || s.openMode === 'browser') {
     window.open(s.url, '_blank', 'noopener,noreferrer');
     showToast(`🌐 تم فتح ${s.name} في المتصفح`);
     return;
@@ -697,6 +809,7 @@ function openSite(s) {
 
   document.body.classList.add('app-mode');
   document.getElementById('backBtn').classList.remove('hidden');
+  updateBackBtnVisibility();
 
 
   // Load iframe
@@ -787,6 +900,32 @@ function _setOpenMode(id, mode) {
   }
 }
 
+// ── Global Browser Mode ────────────────────────────────────────────────
+let globalBrowserMode = localStorage.getItem('rm_global_browser_mode') === 'true';
+
+function toggleGlobalBrowserMode() {
+  globalBrowserMode = !globalBrowserMode;
+  localStorage.setItem('rm_global_browser_mode', globalBrowserMode);
+  _updateGlobalModeUI();
+  showToast(globalBrowserMode 
+    ? '✅ سيتم فتح جميع المواقع في المتصفح الخارجي'
+    : '✅ سيتم فتح المواقع داخل التطبيق');
+}
+
+function _updateGlobalModeUI() {
+  const btn = document.getElementById('globalBrowserModeBtn');
+  const text = document.getElementById('globalModeText');
+  if (!btn || !text) return;
+
+  if (globalBrowserMode) {
+    btn.classList.add('active');
+    text.textContent = 'فتح جميع المواقع في المتصفح (مفعّل)';
+  } else {
+    btn.classList.remove('active');
+    text.textContent = 'فتح جميع المواقع في المتصفح';
+  }
+}
+
 // ── Context menu mode toggle ──────────────────────────────────────────
 function ctxToggleMode() {
   if (!ctxTargetId) return;
@@ -803,11 +942,17 @@ function ctxToggleMode() {
 
 // ── Go Home ───────────────────────────────────────────────────────────
 function goHome() {
+  _navigationStack = ['all']; // Reset stack
+  _currentCategory = 'all';
+  
+  document.getElementById('currentCategoryLabel').textContent = 'كل المواقع';
+
   _currentSite = null;
   document.querySelectorAll('.icon-card').forEach(c => c.classList.remove('active'));
   document.getElementById('currentSiteLabel').textContent = '';
   document.getElementById('viewerWrapper').classList.add('hidden');
   document.getElementById('welcomeScreen').classList.remove('hidden');
+  document.getElementById('iptvSection').classList.add('hidden');
 
   // Show icons strip again
   document.getElementById('iconsStrip').classList.remove('hidden');
@@ -815,10 +960,27 @@ function goHome() {
   document.getElementById('siteSettingsGroup').classList.add('hidden');
 
   document.body.classList.remove('app-mode');
-  document.getElementById('backBtn').classList.add('hidden');
+  // Always show back button if we are not at root home
+  updateBackBtnVisibility();
 
   const frame = document.getElementById('siteFrame');
   frame.src = '';
+  
+  renderIcons();
+  renderWelcomeGrid();
+}
+
+function updateBackBtnVisibility() {
+  const btn = document.getElementById('backBtn');
+  const isIframeOpen = !document.getElementById('viewerWrapper').classList.contains('hidden');
+  const isIptvOpen = !document.getElementById('iptvSection').classList.contains('hidden');
+  const isNotRoot = _currentCategory !== 'all';
+  
+  if (isIframeOpen || isIptvOpen || isNotRoot) {
+    btn.classList.remove('hidden');
+  } else {
+    btn.classList.add('hidden');
+  }
 }
 
 function goBack() {
@@ -880,6 +1042,7 @@ function openAddModal() {
   document.getElementById('siteUrl').value = '';
   document.getElementById('siteColor').value = '#1a1a2e';
   document.getElementById('colorPreviewText').textContent = '#1a1a2e';
+  document.getElementById('siteBgImage').value = '';
   resetIconPreview();
   showModal();
 }
@@ -894,6 +1057,7 @@ function openEditModal(s) {
   document.getElementById('siteColor').value = s.color || '#1a1a2e';
   document.getElementById('colorPreviewText').textContent = s.color || '#1a1a2e';
   document.getElementById('siteCategory').value = s.categoryId || 'general';
+  document.getElementById('siteBgImage').value = s.bgImage || '';
 
   if (s.image) {
     const preview = document.getElementById('iconPreview');
@@ -943,6 +1107,7 @@ function saveShortcut() {
   const url = document.getElementById('siteUrl').value.trim();
   const color = document.getElementById('siteColor').value;
   const categoryId = document.getElementById('siteCategory').value || 'general';
+  const bgImage = document.getElementById('siteBgImage').value.trim();
 
   if (!name) { flashInput('siteName'); return; }
   if (!url) { flashInput('siteUrl'); return; }
@@ -961,6 +1126,7 @@ function saveShortcut() {
         color,
         categoryId,
         image: currentIconImage,
+        bgImage: bgImage || null,
         emoji: shortcuts[idx].emoji || name.charAt(0).toUpperCase()
       };
     }
@@ -974,6 +1140,7 @@ function saveShortcut() {
       color,
       categoryId,
       image: currentIconImage,
+      bgImage: bgImage || null,
       emoji: name.charAt(0).toUpperCase()
     });
   }
@@ -1008,6 +1175,7 @@ function openIPTV() {
   document.getElementById('iptvSection').classList.remove('hidden');
   document.getElementById('iptvBtn').classList.add('active');
   if (typeof iptvInit === 'function') iptvInit();
+  updateBackBtnVisibility();
 }
 
 function closeIPTV() {
@@ -1015,6 +1183,7 @@ function closeIPTV() {
   document.getElementById('iptvBtn').classList.remove('active');
   document.getElementById('iconsStrip').classList.remove('hidden');
   if (typeof closeIPTVPlayer === 'function') closeIPTVPlayer();
+  updateBackBtnVisibility();
 }
 
 // Patch goHome to also close IPTV mode
@@ -1053,11 +1222,66 @@ function toggleCategorySelectMenu() {
 
 function selectCategory(id) {
   _currentCategory = id;
+  
+  // Update navigation stack
+  if (_navigationStack[_navigationStack.length - 1] !== id) {
+    _navigationStack.push(id);
+  }
+  
   const label = id === 'all' ? 'كل المواقع' : (categories.find(c => c.id === id)?.name || 'كل المواقع');
   document.getElementById('currentCategoryLabel').textContent = label;
-  document.getElementById('categorySelectMenu').classList.add('hidden');
+  
+  // Close menu if open
+  const cm = document.getElementById('categorySelectMenu');
+  if (cm) cm.classList.add('hidden');
+  
   renderIcons();
   renderWelcomeGrid();
+  updateBackBtnVisibility();
+  
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function goBackView() {
+  // 1. If an iframe is open (site viewing mode), handle iframe back or close iframe
+  const isIframeOpen = !document.getElementById('viewerWrapper').classList.contains('hidden');
+  if (isIframeOpen) {
+    try {
+      const frame = document.getElementById('siteFrame');
+      // If we can go back in iframe history, do it
+      // Note: This often fails due to CORS, so we might just go home if we can't detect
+      if (frame && frame.contentWindow && frame.contentWindow.history.length > 1) {
+        frame.contentWindow.history.back();
+        return;
+      }
+    } catch (e) {}
+    // If we can't go back in iframe or it's the first page, close iframe and show current folder
+    goHome(); 
+    return;
+  }
+
+  // 2. If IPTV section is open, close it
+  const iptvSection = document.getElementById('iptvSection');
+  if (iptvSection && !iptvSection.classList.contains('hidden')) {
+    goHome();
+    return;
+  }
+
+  // 3. Folder navigation history
+  if (_navigationStack.length > 1) {
+    _navigationStack.pop(); // Remove current
+    const prev = _navigationStack[_navigationStack.length - 1];
+    _currentCategory = prev;
+    
+    const label = _currentCategory === 'all' ? 'كل المواقع' : (categories.find(c => c.id === _currentCategory)?.name || 'كل المواقع');
+    document.getElementById('currentCategoryLabel').textContent = label;
+    
+    renderIcons();
+    renderWelcomeGrid();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  } else {
+    goHome();
+  }
 }
 
 // ── Modals: Manage Categories ──────────────────────────────────────────
