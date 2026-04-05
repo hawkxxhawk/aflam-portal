@@ -107,6 +107,7 @@ const IPTV = {
     langExpanded: false,
     customCatOrder: [],
     playerChoice: 'browser',
+    hiddenCategories: [], // إضافة مصفوفة لتخزين التصنيفات المخفية
 };
 
 // ── Init ──────────────────────────────────────────────
@@ -141,6 +142,9 @@ async function iptvInit() {
     const savedCatOrder = localStorage.getItem('rm_iptv_cat_order');
     if (savedCatOrder) { try { IPTV.customCatOrder = JSON.parse(savedCatOrder); } catch { IPTV.customCatOrder = []; } }
     else if (disk && disk.iptv_customCatOrder) { IPTV.customCatOrder = disk.iptv_customCatOrder; }
+
+    const savedHiddenCats = localStorage.getItem('rm_iptv_hidden_cats');
+    if (savedHiddenCats) { try { IPTV.hiddenCategories = JSON.parse(savedHiddenCats); } catch { IPTV.hiddenCategories = []; } }
 
     const savedPlaylists = await IPTV_DB.get('rm_iptv_playlists');
     if (savedPlaylists) {
@@ -201,8 +205,47 @@ function _iptvIsAdult(name, category) {
     // Remove special chars, keep letters/digits/arabic and spaces
     const clean = text.replace(/[^a-z0-9\u0600-\u06FF\s+]/g, ' ');
 
-    // Unambiguous adult keywords (any occurrence)
-    if (/porn|fuck|hentai|erotic|playboy/.test(clean)) return true;
+    // Explicit adult keywords (any occurrence)
+    if (/\bporn\b/.test(clean)) return true;
+    if (/\bfuck\b/.test(clean)) return true;
+    if (/\bhentai\b/.test(clean)) return true;
+    if (/\berotic\b/.test(clean)) return true;
+    if (/\bplayboy\b/.test(clean)) return true;
+    if (/\bxxx\b/.test(clean)) return true;
+    if (/\bsex\b/.test(clean)) return true;
+    if (/\banal\b/.test(clean)) return true;
+    if (/\bbdsm\b/.test(clean)) return true;
+    if (/\bfetish\b/.test(clean)) return true;
+    if (/\bhardcore\b/.test(clean)) return true;
+    if (/\binterracial\b/.test(clean)) return true;
+    if (/\bmature\b/.test(clean)) return true;
+    if (/\bmilf\b/.test(clean)) return true;
+    if (/\borgy\b/.test(clean)) return true;
+    if (/\bthreesome\b/.test(clean)) return true;
+    if (/\bgangbang\b/.test(clean)) return true;
+    if (/\bblowjob\b/.test(clean)) return true;
+    if (/\bcreampie\b/.test(clean)) return true;
+    if (/\bcumshot\b/.test(clean)) return true;
+    if (/\bpussy\b/.test(clean)) return true;
+    if (/\bdick\b/.test(clean)) return true;
+    if (/\bcock\b/.test(clean)) return true;
+    if (/\btits\b/.test(clean)) return true;
+    if (/\bboobs\b/.test(clean)) return true;
+    if (/\bnude\b/.test(clean)) return true;
+    if (/\bnaked\b/.test(clean)) return true;
+    if (/\bstriptease\b/.test(clean)) return true;
+    if (/\blingerie\b/.test(clean)) return true;
+    if (/\bbikini\b/.test(clean)) return true;
+    if (/\btopless\b/.test(clean)) return true;
+    if (/\bbusty\b/.test(clean)) return true;
+    if (/\bcheerleader\b/.test(clean)) return true;
+    if (/\bescort\b/.test(clean)) return true;
+    if (/\bprostitute\b/.test(clean)) return true;
+    if (/\bwhore\b/.test(clean)) return true;
+    if (/\bslut\b/.test(clean)) return true;
+    if (/\bbitch\b/.test(clean)) return true;
+    if (/\bhooker\b/.test(clean)) return true;
+    if (/\bstripper\b/.test(clean)) return true;
 
     // Context-sensitive keywords as standalone words
     if (/(?:^|\s)adult(?:\s|$)/.test(clean)) return true;
@@ -287,11 +330,7 @@ function iptvFilter() {
                 return 1;
             }
 
-            // 2. Default sorting: Adult first > AR second > rest by count descending
-            const aAdult = nameA.includes('🔞') ? 1 : 0;
-            const bAdult = nameB.includes('🔞') ? 1 : 0;
-            if (aAdult !== bAdult) return bAdult - aAdult;
-
+            // 2. Default sorting: AR first > rest by count descending
             const isArA = (nameA.toUpperCase().includes('AR') || nameA.includes('عرب') || /[\u0600-\u06FF]/.test(nameA)) ? 1 : 0;
             const isArB = (nameB.toUpperCase().includes('AR') || nameB.includes('عرب') || /[\u0600-\u06FF]/.test(nameB)) ? 1 : 0;
             if (isArA !== isArB) return isArB - isArA;
@@ -299,6 +338,9 @@ function iptvFilter() {
             return b[1] - a[1];
         })
         .map(([name, count]) => ({ name, count }));
+
+    // تصفية التصنيفات المخفية
+    IPTV.categories = IPTV.categories.filter(cat => !IPTV.hiddenCategories.includes(cat.name));
 
     // Build languages
     const langMap = {};
@@ -411,6 +453,7 @@ function iptvRenderSidebar() {
       <div class="cat-order-btns">
         <button class="order-btn" onclick='event.stopPropagation(); catMove(event, ${JSON.stringify(c.name).replace(/'/g, "&apos;")}, -1)' title="لأعلى">▲</button>
         <button class="order-btn" onclick='event.stopPropagation(); catMove(event, ${JSON.stringify(c.name).replace(/'/g, "&apos;")}, 1)' title="لأسفل">▼</button>
+        <button class="order-btn" onclick='event.stopPropagation(); toggleHideCategory(${JSON.stringify(c.name).replace(/'/g, "&apos;")})' title="إخفاء/إظهار">👁</button>
       </div>
     </div>`).join('');
 }
@@ -473,6 +516,29 @@ document.addEventListener('dragend', (e) => {
         e.target.classList.remove('dragging');
     }
 });
+
+// ── Toggle Hide/Show Category ────────────────────────
+function toggleHideCategory(catName) {
+    const index = IPTV.hiddenCategories.indexOf(catName);
+    if (index > -1) {
+        // إظهار التصنيف
+        IPTV.hiddenCategories.splice(index, 1);
+        showToast(`✅ تم إظهار تصنيف "${catName}"`);
+    } else {
+        // إخفاء التصنيف
+        IPTV.hiddenCategories.push(catName);
+        // إذا كان التصنيف المخفي هو المختار حالياً، قم بتحديد "الكل"
+        if (IPTV.activeCat === catName) {
+            iptvSetCat('all');
+        }
+        showToast(`👁 تم إخفاء تصنيف "${catName}"`);
+    }
+    // حفظ التصنيفات المخفية في localStorage
+    localStorage.setItem('rm_iptv_hidden_cats', JSON.stringify(IPTV.hiddenCategories));
+    // إعادة بناء القوائم
+    iptvFilter();
+    iptvRenderSidebar();
+}
 
 function iptvCatIcon(n) {
     const l = n.toLowerCase();
@@ -1138,11 +1204,19 @@ async function playSeriesFirstEpisode(ch) {
             const epName = `${ch.name} - S${firstEp.season} E${firstEp.episode_num}`;
             
             if (IPTV.playerChoice === 'vlc') {
-                window.open('vlc://' + epUrl, '_self');
+                const vlcUrl = `vlc://${epUrl}`;
+                const a = document.createElement('a');
+                a.href = vlcUrl;
+                a.target = '_blank';
+                a.click();
                 if (typeof showToast === 'function') showToast(`🟠 جاري فتح ${epName} في VLC...`);
                 return;
             } else if (IPTV.playerChoice === 'potplayer') {
-                window.open('potplayer://' + epUrl, '_self');
+                const potUrl = `potplayer://${epUrl}`;
+                const a = document.createElement('a');
+                a.href = potUrl;
+                a.target = '_blank';
+                a.click();
                 if (typeof showToast === 'function') showToast(`🟡 جاري فتح ${epName} في PotPlayer...`);
                 return;
             }

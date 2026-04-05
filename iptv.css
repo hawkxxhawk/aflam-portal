@@ -149,6 +149,33 @@
     flex-shrink: 0;
 }
 
+.cat-order-btns {
+    display: flex;
+    gap: 2px;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.cat-item:hover .cat-order-btns {
+    opacity: 1;
+}
+
+.order-btn {
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    color: var(--text-muted);
+    font-size: 10px;
+    padding: 2px 4px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+}
+
+.order-btn:hover {
+    background: rgba(229, 9, 20, 0.3);
+    color: var(--accent);
+}
+
 /* ── Channels Area ── */
 #channelsArea {
     flex: 1;
