@@ -115,6 +115,9 @@ async function iptvInit() {
     if (IPTV.initialized) { iptvRenderAll(); return; }
     IPTV.initialized = true;
 
+    // تهيئة وظيفة سحب الشريط الجانبي
+    initSidebarResize();
+
     // Fetch initial data from chunks or data.json
     let disk = null;
     if (typeof loadDataFromChunks === 'function') {
@@ -716,7 +719,25 @@ function iptvSetSrc(id) {
     iptvRenderAll();
 }
 
-function iptvSetCat(name) { IPTV.activeCat = name; iptvFilter(); iptvRenderAll(); }
+function iptvSetCat(name) { 
+    IPTV.activeCat = name; 
+    iptvFilter(); 
+    iptvRenderAll();
+    iptvUpdateCategoryTitle();
+}
+
+// تحديث عنوان التصنيف المحدد
+function iptvUpdateCategoryTitle() {
+    const titleEl = document.getElementById('currentCategoryTitle');
+    if (!titleEl) return;
+
+    if (IPTV.activeCat === 'all') {
+        titleEl.style.display = 'none';
+    } else {
+        titleEl.style.display = 'block';
+        titleEl.textContent = IPTV.activeCat;
+    }
+}
 function iptvSetLang(code) { IPTV.activeLang = code; iptvFilter(); iptvRenderGrid(); iptvRenderSidebar(); }
 function iptvSearch(q) { IPTV.query = q; iptvFilter(); iptvRenderGrid(); }
 
@@ -1363,4 +1384,69 @@ function toggleIPTVFs() {
     const el = document.getElementById('iptvPlayerOverlay');
     if (!document.fullscreenElement) el.requestFullscreen().catch(() => { });
     else document.exitFullscreen().catch(() => { });
+}
+
+// ── Sidebar Resize Functionality ─────────────────────────────
+function initSidebarResize() {
+    const sidebar = document.getElementById('iptvSidebar');
+    const handle = document.getElementById('sidebarResizeHandle');
+
+    if (!sidebar || !handle) return;
+
+    let isResizing = false;
+    let startX = 0;
+    let startWidth = 0;
+    const minWidth = 200;
+    const maxWidth = 500;
+
+    // استرجاع العرض المحفوظ من localStorage
+    const savedWidth = localStorage.getItem('rm_iptv_sidebar_width');
+    if (savedWidth) {
+        const width = parseInt(savedWidth);
+        if (width >= minWidth && width <= maxWidth) {
+            sidebar.style.width = width + 'px';
+        }
+    }
+
+    handle.addEventListener('mousedown', (e) => {
+        isResizing = true;
+        startX = e.clientX;
+        startWidth = sidebar.offsetWidth;
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+        e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (!isResizing) return;
+
+        const diff = e.clientX - startX;
+        const newWidth = startWidth + diff;
+
+        if (newWidth >= minWidth && newWidth <= maxWidth) {
+            sidebar.style.width = newWidth + 'px';
+        }
+    });
+
+    document.addEventListener('mouseup', () => {
+        if (isResizing) {
+            isResizing = false;
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+
+            // حفظ العرض الجديد في localStorage
+            localStorage.setItem('rm_iptv_sidebar_width', sidebar.style.width);
+        }
+    });
+
+    // تحديث عرض المقبض عند تمرير الماوس فوقه
+    handle.addEventListener('mouseenter', () => {
+        handle.style.background = 'rgba(229, 9, 20, 0.3)';
+    });
+
+    handle.addEventListener('mouseleave', () => {
+        if (!isResizing) {
+            handle.style.background = 'transparent';
+        }
+    });
 }

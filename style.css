@@ -37,6 +37,44 @@ body {
   display: none !important;
 }
 
+#updateProgressWrapper {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 120;
+  padding: 10px 14px 14px;
+  background: rgba(10, 10, 20, 0.95);
+  backdrop-filter: blur(20px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+#updateProgressLabel {
+  color: var(--text);
+  font-size: 0.92rem;
+  font-weight: 700;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+#updateProgressBarOuter {
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+#updateProgressFill {
+  width: 0%;
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+  transition: width 0.25s ease;
+}
+
 /* ===== SCROLLBAR ===== */
 ::-webkit-scrollbar {
   width: 10px;
@@ -244,6 +282,9 @@ html {
   overflow-y: hidden;
   padding: 6px 4px;
   scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
+  overscroll-behavior-x: contain;
 }
 
 #iconsContainer {
@@ -252,6 +293,13 @@ html {
   gap: 10px;
   width: max-content;
   padding: 0 4px;
+}
+
+#topBar,
+#topBar button,
+#topBar .ctrl-btn,
+.category-selector-wrapper {
+  touch-action: manipulation;
 }
 
 /* Icon Card */
@@ -697,6 +745,56 @@ html {
   }
 }
 
+/* Color Picker Modal Styles */
+#colorPickerModal {
+  z-index: 99999 !important;
+  pointer-events: auto !important;
+}
+
+#colorPickerModal .modal {
+  pointer-events: auto !important;
+  position: relative;
+  z-index: 100000 !important;
+}
+
+#colorOptions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 20px 0;
+  pointer-events: auto !important;
+  position: relative;
+  z-index: 100010 !important;
+}
+
+button[data-color] {
+  position: relative;
+  z-index: 100001 !important;
+  pointer-events: auto !important;
+  transition: transform 0.2s, box-shadow 0.2s;
+  border: 3px solid transparent !important;
+  padding: 0 !important;
+  background-clip: border-box !important;
+  cursor: pointer !important;
+}
+
+button[data-color]:hover {
+  transform: scale(1.1);
+}
+
+button[data-color]:active {
+  transform: scale(0.95);
+}
+
+.color-option:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.color-option:active {
+  transform: scale(0.95);
+}
+
 .modal-header {
   display: flex;
   align-items: center;
@@ -1102,9 +1200,10 @@ body.app-mode #viewerWrapper {
 }
 
 /* ── Favorites Grid Layout (4 columns) ── */
-#welcomeIconsGrid.fav-view {
+#welcomeIconsGrid.fav-view,
+#welcomeIconsGrid.category-view {
   display: grid !important;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 12px;
   overflow-y: visible;
   overflow-x: hidden;
@@ -1115,6 +1214,11 @@ body.app-mode #viewerWrapper {
   align-items: unset;
   flex-wrap: unset;
   justify-content: unset;
+}
+
+#welcomeIconsGrid.category-view .welcome-icon-item {
+  width: 100%;
+  max-width: 260px;
 }
 
 /* Name-only Frame Style for Favorites */

@@ -193,6 +193,13 @@
 
   </header>
 
+  <div id="updateProgressWrapper" class="hidden">
+    <div id="updateProgressLabel">جاري تحديث البيانات في الخلفية...</div>
+    <div id="updateProgressBarOuter">
+      <div id="updateProgressFill"></div>
+    </div>
+  </div>
+
   <!-- ===== WELCOME SCREEN ===== -->
   <main id="welcomeScreen">
     <div class="welcome-content">
@@ -230,8 +237,23 @@
   <div id="contextMenu" class="context-menu hidden">
     <button id="ctxModeBtn" onclick="ctxToggleMode()">🌐 افتح دائماً في المتصفح</button>
     <button onclick="ctxEdit()">✏️ تعديل</button>
+    <button onclick="openColorPicker()">🎨 لون الإطار</button>
     <button onclick="ctxDelete()">🗑️ حذف</button>
     <button onclick="closeContextMenu()">✕ إلغاء</button>
+  </div>
+
+  <!-- ===== COLOR PICKER MODAL ===== -->
+  <div id="colorPickerModal" class="modal-overlay hidden" style="z-index: 99999;" onclick="if(event.target === event.currentTarget) closeColorPicker()">
+    <div class="modal" style="max-width: 320px; pointer-events: auto;">
+      <h3>اختر لون الإطار</h3>
+      <div id="colorOptions" style="display: flex; flex-wrap: wrap; gap: 12px; margin: 20px 0; pointer-events: auto; position: relative; z-index: 100010;">
+        <!-- تُملأ ديناميكياً بواسطة JavaScript -->
+      </div>
+      <div style="display: flex; gap: 10px; pointer-events: auto;">
+        <button type="button" class="ctrl-btn" onclick="closeColorPicker()" style="flex: 1; pointer-events: auto; z-index: 100015; position: relative;">إلغاء</button>
+        <button type="button" class="ctrl-btn accent" onclick="removeBorderColor()" style="flex: 1; pointer-events: auto; z-index: 100015; position: relative;">إزالة اللون</button>
+      </div>
+    </div>
   </div>
 
   <!-- ===== ADD / EDIT MODAL ===== -->
@@ -347,6 +369,7 @@
   <div id="iptvSection" class="hidden">
     <div id="iptvLayout">
       <aside id="iptvSidebar">
+        <div id="sidebarResizeHandle" style="position:absolute;left:0;top:0;bottom:0;width:5px;cursor:col-resize;background:transparent;z-index:10;"></div>
         <div class="sidebar-search">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="11" cy="11" r="8" />
@@ -377,6 +400,7 @@
       </aside>
       <main id="channelsArea">
         <div id="iptvTopBar" style="display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--glass-border);background:var(--glass);flex-shrink:0;">
+          <div id="currentCategoryTitle" style="display:none;font-size:14px;font-weight:700;color:var(--accent);margin-left:12px;"></div>
           <div id="iptvTypeTabs" class="hidden" style="display:flex;gap:8px;flex:1;">
             <button id="tabLive" class="ctrl-btn active" onclick="switchIptvType('live')">📺 بث مباشر</button>
             <button id="tabVod" class="ctrl-btn" onclick="switchIptvType('vod')">🎬 أفلام</button>

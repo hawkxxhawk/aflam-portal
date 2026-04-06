@@ -561,4 +561,127 @@
     #playerChName {
         font-size: 13px;
     }
+
+/* ── Playlist Picker Modal ── */
+.pl-picker-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    padding: 20px;
+    padding-top: 80px;
+}
+
+.pl-picker-box {
+    background: var(--bg2);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+    width: 100%;
+    max-width: 380px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.pl-picker-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    background: rgba(255, 255, 255, 0.04);
+    border-bottom: 1px solid var(--glass-border);
+}
+
+.pl-picker-header span {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.pl-picker-header button {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 20px;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    transition: color 0.2s, background 0.2s;
+}
+
+.pl-picker-header button:hover {
+    color: var(--text);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.pl-picker-body {
+    padding: 12px;
+    overflow-y: auto;
+    max-height: 60vh;
+}
+
+.pl-picker-empty {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 13px;
+    padding: 24px 16px;
+}
+
+.pl-picker-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--glass-border);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+    margin-bottom: 8px;
+    width: 100%;
+    text-align: right;
+}
+
+.pl-picker-item:hover {
+    background: rgba(229, 9, 20, 0.1);
+    border-color: rgba(229, 9, 20, 0.3);
+}
+
+.pl-picker-item span:first-child {
+    font-size: 18px;
+}
+
+.pl-picker-item span:nth-child(2) {
+    flex: 1;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.pl-picker-count {
+    font-size: 11px;
+    background: rgba(255, 255, 255, 0.08);
+    padding: 2px 8px;
+    border-radius: 20px;
+    color: var(--text-muted);
+}
+
+.pl-picker-footer {
+    padding: 14px 20px;
+    background: rgba(255, 255, 255, 0.04);
+    border-top: 1px solid var(--glass-border);
+}
+
+.pl-picker-footer button {
+    width: 100%;
+    padding: 12px;
+    font-size: 14px;
+    font-weight: 700;
+}
 }

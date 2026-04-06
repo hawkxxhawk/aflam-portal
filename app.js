@@ -80,47 +80,196 @@ let ctxTargetId = null;
 let currentIconImage = null;
 
 // ── Data loading strategy ─────────────────────────────────────────────
-// Priority: IndexedDB (newest user changes) > database_chunks/dataX.json (bundled seed)
+// Priority: localStorage / IndexedDB quick snapshot > initial bundle file > full chunk refresh
+const INITIAL_CHUNK_URLS = [
+  './database_chunks/initial_load.json',
+  './database_chunks/data1.json'
+];
 
 // Helper to check if we are on a mobile device
 const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
-async function loadDataFromChunks() {
+function getProgressElements() {
+  return {
+    wrapper: document.getElementById('updateProgressWrapper'),
+    label: document.getElementById('updateProgressLabel'),
+    fill: document.getElementById('updateProgressFill')
+  };
+}
+
+function updateBackgroundProgress(loaded, description) {
+  const { wrapper, label, fill } = getProgressElements();
+  if (!wrapper || !label || !fill) return;
+  wrapper.classList.remove('hidden');
+  label.textContent = description || `تحميل البيانات في الخلفية... جزء ${loaded}`;
+  fill.style.width = `${Math.min(98, loaded * 18)}%`;
+}
+
+function hideBackgroundProgress() {
+  const { wrapper, fill } = getProgressElements();
+  if (!wrapper || !fill) return;
+  fill.style.width = '100%';
+  setTimeout(() => wrapper.classList.add('hidden'), 600);
+}
+
+async function loadJsonFile(path) {
+  const res = await fetch(`${path}?_=${Date.now()}`);
+  if (!res.ok) return null;
+  return await res.json();
+}
+
+async function loadDataFromChunks(progressCallback = null) {
   let combinedStr = '';
-  let i = 1;
-  let success = false;
-  
-  try {
-    while (true) {
-      try {
-        const res = await fetch(`./database_chunks/data${i}.json?_=${Date.now()}`);
-        if (res.ok) {
-          const text = await res.text();
-          combinedStr += text;
-          i++;
-          success = true;
-          if (i % 2 === 0) showToast(`⏳ جاري تحميل الجزء ${i}...`);
-        } else {
-          break;
-        }
-      } catch (e) {
-        break;
-      }
-    }
-    
-    if (success && combinedStr) {
-      return JSON.parse(combinedStr);
-    }
-    
-    // Fallback to old data.json
+  let chunkCount = 0;
+
+  while (true) {
+    const fileName = `./database_chunks/data${chunkCount + 1}.json`;
     try {
-      const res = await fetch('./data.json?_=' + Date.now());
-      if (res.ok) return await res.json();
-    } catch (e) {}
-  } catch (err) {
-    console.error("Error loading data chunks:", err);
+      const res = await fetch(`${fileName}?_=${Date.now()}`);
+      if (!res.ok) break;
+      combinedStr += await res.text();
+      chunkCount += 1;
+      if (typeof progressCallback === 'function') progressCallback(chunkCount, fileName);
+      if (chunkCount % 2 === 0 && !progressCallback) showToast(`⏳ جاري تحميل الجزء ${chunkCount}...`);
+    } catch (e) {
+      break;
+    }
+  }
+
+  if (chunkCount > 0 && combinedStr) {
+    return JSON.parse(combinedStr);
+  }
+
+  try {
+    const fallback = await loadJsonFile('./data.json');
+    if (fallback) return fallback;
+  } catch (ignore) {}
+  return null;
+}
+
+async function loadInitialDataFromChunks() {
+  for (const filePath of INITIAL_CHUNK_URLS) {
+    try {
+      const payload = await loadJsonFile(filePath);
+      if (payload && payload.shortcuts) return payload;
+    } catch (e) { }
   }
   return null;
+}
+
+async function loadQuickSnapshot() {
+  try {
+    const lsShortcuts = localStorage.getItem('rm_shortcuts');
+    if (lsShortcuts) {
+      const parsed = JSON.parse(lsShortcuts);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const parsedCats = JSON.parse(localStorage.getItem('rm_categories') || '[]');
+        return {
+          shortcuts: parsed,
+          categories: Array.isArray(parsedCats) ? parsedCats : categories
+        };
+      }
+    }
+  } catch (e) {}
+
+  if (typeof IPTV_DB !== 'undefined') {
+    try {
+      const dbShortcuts = await IPTV_DB.get('rm_shortcuts') || [];
+      if (Array.isArray(dbShortcuts) && dbShortcuts.length > 0) {
+        const dbCategories = await IPTV_DB.get('rm_categories') || [];
+        return {
+          shortcuts: dbShortcuts,
+          categories: Array.isArray(dbCategories) ? dbCategories : categories
+        };
+      }
+    } catch (e) { console.warn('Failed to read quick snapshot from IndexedDB', e); }
+  }
+
+  return null;
+}
+
+async function backgroundRefreshFromChunks(preserveLocal = false, showToasts = true) {
+  if (showToasts) showToast('⏳ جاري تحديث البيانات في الخلفية...');
+  updateBackgroundProgress(0, 'بدء تحديث البيانات في الخلفية...');
+
+  const disk = await loadDataFromChunks((loaded, fileName) => {
+    updateBackgroundProgress(loaded, `تحميل ${fileName} (${loaded} جزء)`);
+  });
+
+  if (disk && (disk.shortcuts || disk.iptv_sources)) {
+    if (Array.isArray(disk.shortcuts)) {
+      if (preserveLocal && shortcuts.length > 0) {
+        const existingIds = new Set(shortcuts.map(s => s.id));
+        const mergedShortcuts = [...shortcuts];
+        disk.shortcuts.forEach(item => {
+          if (!existingIds.has(item.id)) mergedShortcuts.push(item);
+        });
+        shortcuts = mergedShortcuts;
+      } else {
+        shortcuts = disk.shortcuts;
+      }
+    }
+
+    if (Array.isArray(disk.categories)) {
+      if (preserveLocal && categories.length > 0) {
+        const existingCatIds = new Set(categories.map(c => c.id));
+        const mergedCategories = [...categories];
+        disk.categories.forEach(cat => {
+          if (!existingCatIds.has(cat.id)) mergedCategories.push(cat);
+        });
+        categories = mergedCategories;
+      } else {
+        categories = disk.categories;
+      }
+    }
+
+    if (Array.isArray(disk.shortcuts) && !shortcuts.some(s => s.categoryId === 'favorites_folder')) {
+      const chunkFavs = await loadFavoritesFromChunks();
+      shortcuts = [...shortcuts.filter(s => s.categoryId !== 'favorites_folder' && s.categoryId !== 'favorites_folder_2'), ...chunkFavs.favs1, ...chunkFavs.favs2];
+    }
+
+    if (disk.iptv_sources && typeof IPTV_DB !== 'undefined') {
+      await IPTV_DB.set('rm_iptv', disk.iptv_sources);
+      if (disk.iptv_playlists) await IPTV_DB.set('rm_iptv_playlists', disk.iptv_playlists);
+      localStorage.setItem('rm_iptv', 'USE_IDB');
+      localStorage.setItem('rm_iptv_playlists', 'USE_IDB');
+      if (disk.iptv_favs) localStorage.setItem('rm_iptv_favs', JSON.stringify(disk.iptv_favs));
+      if (disk.iptv_customCatOrder) localStorage.setItem('rm_iptv_cat_order', JSON.stringify(disk.iptv_customCatOrder));
+      if (disk.iptv_playerChoice) localStorage.setItem('rm_iptv_player', disk.iptv_playerChoice);
+
+      if (typeof IPTV !== 'undefined') {
+        IPTV.sources = disk.iptv_sources;
+        if (disk.iptv_favs) IPTV.favorites = disk.iptv_favs;
+        if (disk.iptv_playlists) IPTV.playlists = disk.iptv_playlists;
+        if (disk.iptv_customCatOrder) IPTV.customCatOrder = disk.iptv_customCatOrder;
+        if (disk.iptv_playerChoice) IPTV.playerChoice = disk.iptv_playerChoice;
+        if (typeof iptvBuild === 'function') iptvBuild();
+      }
+    }
+
+    const uniqueCats = [];
+    const catMap = new Map();
+    categories.forEach(c => {
+      if (!catMap.has(c.id)) {
+        catMap.set(c.id, true);
+        uniqueCats.push(c);
+      }
+    });
+    categories = uniqueCats;
+
+    shortcuts.forEach(s => { if (!s.categoryId) s.categoryId = 'general'; });
+
+    await saveShortcuts();
+    renderCategorySelector();
+    renderIcons();
+    renderWelcomeGrid();
+    updateBackBtnVisibility();
+    if (showToasts) showToast('✅ تم تحديث البيانات في الخلفية بنجاح');
+  } else if (showToasts) {
+    showToast('❌ فشل في تحديث البيانات في الخلفية');
+  }
+
+  hideBackgroundProgress();
 }
 
 // ── Favorites File Logic ──────────────────────────────────────────────
@@ -217,65 +366,49 @@ async function initApp() {
       categories.push({ id: 'favorites_folder_2', name: 'مفضلة 2', isSystem: true });
     }
 
-    // 2. Load from IndexedDB
-    let dbShortcuts = [];
-    if (typeof IPTV_DB !== 'undefined') {
-      dbShortcuts = await IPTV_DB.get('rm_shortcuts') || [];
-      const dbCategories = await IPTV_DB.get('rm_categories');
-      if (dbShortcuts.length > 0) {
-        shortcuts = dbShortcuts;
-        if (dbCategories && Array.isArray(dbCategories)) {
-          dbCategories.forEach(c => {
-            if (!categories.some(exist => exist.id === c.id)) categories.push(c);
-          });
-        }
+    // 2. Fast initial load from browser storage or IndexedDB
+    const quickSnapshot = await loadQuickSnapshot();
+    const preserveLocal = Boolean(quickSnapshot && Array.isArray(quickSnapshot.shortcuts) && quickSnapshot.shortcuts.length > 0);
+
+    if (preserveLocal) {
+      shortcuts = quickSnapshot.shortcuts;
+      if (Array.isArray(quickSnapshot.categories) && quickSnapshot.categories.length > 0) {
+        quickSnapshot.categories.forEach(c => {
+          if (!categories.some(exist => exist.id === c.id)) categories.push(c);
+        });
       }
     }
 
-    // 3. Load external favorites from files — only if the user has no saved favorites in DB
-    //    This prevents wiping user-added favorites on every page reload.
-    const dbHasFavs1 = dbShortcuts.some(s => s.categoryId === 'favorites_folder');
-    const dbHasFavs2 = dbShortcuts.some(s => s.categoryId === 'favorites_folder_2');
+    const dbHasFavs1 = shortcuts.some(s => s.categoryId === 'favorites_folder');
+    const dbHasFavs2 = shortcuts.some(s => s.categoryId === 'favorites_folder_2');
 
     const externalFavs1 = dbHasFavs1 ? [] : await loadFavoritesFromFile();
     const externalFavs2 = dbHasFavs2 ? [] : await loadFavorites2FromFile();
 
-    // Remove file-sourced favorites only when we are about to replace them with file data
     if (!dbHasFavs1) shortcuts = shortcuts.filter(s => s.categoryId !== 'favorites_folder');
     if (!dbHasFavs2) shortcuts = shortcuts.filter(s => s.categoryId !== 'favorites_folder_2');
     shortcuts = [...shortcuts, ...externalFavs1, ...externalFavs2];
 
-    // 4. Fallback to localStorage (legacy)
+    // 3. Load an initial bundle file if no local snapshot is available
     if (shortcuts.length === 0) {
-      const lsData = localStorage.getItem('rm_shortcuts');
-      const lsCat = localStorage.getItem('rm_categories');
-      if (lsData) {
-        try {
-          const parsed = JSON.parse(lsData);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            shortcuts = parsed;
-            const parsedCat = JSON.parse(lsCat);
-            if (Array.isArray(parsedCat)) {
-              parsedCat.forEach(c => {
-                if (!categories.some(exist => exist.id === c.id)) categories.push(c);
-              });
-            }
-          }
-        } catch (e) {}
-      }
-    }
+      const initialPayload = await loadInitialDataFromChunks();
+      if (initialPayload) {
+        shortcuts = initialPayload.shortcuts || DEFAULT_SHORTCUTS.map(s => ({ ...s }));
+        if (Array.isArray(initialPayload.categories)) {
+          initialPayload.categories.forEach(c => {
+            if (!categories.some(exist => exist.id === c.id)) categories.push(c);
+          });
+        }
 
-    // 5. Load from chunks if still empty
-    if (shortcuts.length === 0) {
-      const disk = await loadDataFromChunks();
-      if (disk) {
-        shortcuts = disk.shortcuts || DEFAULT_SHORTCUTS.map(s => ({ ...s }));
-        // Load favorites from database_chunks
         const chunkFavs = await loadFavoritesFromChunks();
-        // Remove existing favorites and add from chunks
         shortcuts = shortcuts.filter(s => s.categoryId !== 'favorites_folder' && s.categoryId !== 'favorites_folder_2');
         shortcuts = [...shortcuts, ...chunkFavs.favs1, ...chunkFavs.favs2];
       }
+    }
+
+    // 4. Fallback to DEFAULT_SHORTCUTS if nothing loaded
+    if (shortcuts.length === 0) {
+      shortcuts = DEFAULT_SHORTCUTS.map(s => ({ ...s }));
     }
 
     // Final safety
@@ -307,6 +440,11 @@ async function initApp() {
       loader.style.opacity = '0';
       setTimeout(() => loader.remove(), 600);
     }
+
+    // Refresh full data in the background after the first page is visible
+    backgroundRefreshFromChunks(preserveLocal, false).catch(err => {
+      console.warn('Background refresh failed:', err);
+    });
   } catch (err) {
     console.error("Critical Init Error:", err);
     showToast('⚠️ خطأ في تحميل البيانات');
@@ -316,7 +454,7 @@ async function initApp() {
 function setupEventListeners() {
   document.addEventListener('click', (e) => {
     // Hide context menu
-    if (!e.target.closest('.icon-card')) closeContextMenu();
+    if (!e.target.closest('.icon-card') && !e.target.closest('#colorPickerModal')) closeContextMenu();
     // Hide settings menu
     const sm = document.getElementById('settingsMenu');
     if (sm && !sm.classList.contains('hidden') && !e.target.closest('#settingsMenu') && !e.target.closest('#settingsBtn')) {
@@ -482,71 +620,7 @@ window.addEventListener('load', () => {
 }); // Use 'load' to ensure all assets are ready for mobile
 
 async function forceReloadFromChunks() {
-  showToast('⏳ جاري جلب أحدث البيانات من السيرفر...');
-  const disk = await loadDataFromChunks();
-
-  if (disk && (disk.shortcuts || disk.iptv_sources)) {
-    if (disk.shortcuts) {
-      // Load favorites from database_chunks
-      const chunkFavs = await loadFavoritesFromChunks();
-
-      // ✅ Use favorites from database_chunks instead of user's favorites
-      const diskNonFavs = disk.shortcuts.filter(
-        s => s.categoryId !== 'favorites_folder' && s.categoryId !== 'favorites_folder_2'
-      );
-      shortcuts = [...diskNonFavs, ...chunkFavs.favs1, ...chunkFavs.favs2];
-    }
-
-    if (disk.categories) {
-      // Merge: use disk categories as base, but keep any user-created folders not in disk
-      const diskCatIds = new Set(disk.categories.map(c => c.id));
-      const userOnlyCats = categories.filter(
-        c => !diskCatIds.has(c.id) &&
-             c.id !== 'favorites_folder' &&
-             c.id !== 'favorites_folder_2'
-      );
-      categories = [...disk.categories, ...userOnlyCats];
-      // Always ensure system folders are present
-      if (!categories.some(c => c.id === 'favorites_folder'))
-        categories.unshift({ id: 'favorites_folder', name: 'المفضلة', isSystem: true });
-      if (!categories.some(c => c.id === 'favorites_folder_2'))
-        categories.splice(1, 0, { id: 'favorites_folder_2', name: 'مفضلة 2', isSystem: true });
-    }
-
-    shortcuts.forEach(s => { if (!s.categoryId) s.categoryId = 'general'; });
-    
-    // Save to IDB
-    await saveShortcuts();
-    
-    if (disk.iptv_sources && typeof IPTV_DB !== 'undefined') {
-      await IPTV_DB.set('rm_iptv', disk.iptv_sources);
-      if (disk.iptv_playlists) await IPTV_DB.set('rm_iptv_playlists', disk.iptv_playlists);
-      localStorage.setItem('rm_iptv', 'USE_IDB');
-      localStorage.setItem('rm_iptv_playlists', 'USE_IDB');
-
-      if (disk.iptv_favs) localStorage.setItem('rm_iptv_favs', JSON.stringify(disk.iptv_favs));
-      if (disk.iptv_customCatOrder) localStorage.setItem('rm_iptv_cat_order', JSON.stringify(disk.iptv_customCatOrder));
-      if (disk.iptv_playerChoice) localStorage.setItem('rm_iptv_player', disk.iptv_playerChoice);
-      
-      if (typeof IPTV !== 'undefined') {
-        IPTV.sources = disk.iptv_sources;
-        if (disk.iptv_favs) IPTV.favorites = disk.iptv_favs;
-        if (disk.iptv_playlists) IPTV.playlists = disk.iptv_playlists;
-        if (disk.iptv_customCatOrder) IPTV.customCatOrder = disk.iptv_customCatOrder;
-        if (disk.iptv_playerChoice) IPTV.playerChoice = disk.iptv_playerChoice;
-        if (typeof iptvBuild === 'function') iptvBuild();
-      }
-    }
-    
-    renderCategorySelector();
-    renderIcons();
-    renderWelcomeGrid();
-    
-    document.getElementById('settingsMenu').classList.add('hidden');
-    showToast('✅ تم تحديث كافة البيانات بنجاح');
-  } else {
-    showToast('❌ فشل في جلب البيانات. تأكد من اتصالك بالإنترنت');
-  }
+  await backgroundRefreshFromChunks(false, true);
 }
 
 // ── Persistence ───────────────────────────────────────────────────────
@@ -644,7 +718,26 @@ async function exportData() {
   try {
     const zip = new JSZip();
     const dbFolder = zip.folder("database_chunks");
-    
+
+    const initialPayload = {
+      version: payload.version,
+      exported: payload.exported,
+      shortcuts: currentShortcuts.slice(0, 50),
+      categories: currentCategories,
+      _comment: 'هذا الملف للتحميل الأولي السريع من مجلد database_chunks'
+    };
+    dbFolder.file('initial_load.json', JSON.stringify(initialPayload, null, 2));
+
+    const favouritesPayload = currentShortcuts
+      .filter(s => s.categoryId === 'favorites_folder')
+      .map(({ isExternalFav, ...rest }) => rest);
+    const favourites2Payload = currentShortcuts
+      .filter(s => s.categoryId === 'favorites_folder_2')
+      .map(({ isExternalFav, ...rest }) => rest);
+
+    dbFolder.file('favourit.json', JSON.stringify(favouritesPayload, null, 2));
+    dbFolder.file('favourit2.json', JSON.stringify(favourites2Payload, null, 2));
+
     chunks.forEach((chunk, index) => {
       dbFolder.file(`data${index + 1}.json`, chunk);
     });
@@ -658,7 +751,7 @@ async function exportData() {
     URL.revokeObjectURL(url);
 
     showToast(
-      `✅ تم التصدير بنجاح — ${chunks.length} ملفات مقسمة`
+      `✅ تم التصدير بنجاح — ${chunks.length} ملفات مقسمة` 
     );
   } catch (err) {
     console.error(err);
@@ -793,6 +886,8 @@ function showToast(msg) {
 // ── Render icon bar ───────────────────────────────────────────────────
 function renderIcons() {
   const container = document.getElementById('iconsContainer');
+  const strip = document.getElementById('iconsStrip');
+  if (strip) strip.classList.toggle('hidden', _currentCategory === 'all');
   container.innerHTML = '';
 
   const filtered = _currentCategory === 'all' ? shortcuts : shortcuts.filter(s => s.categoryId === _currentCategory);
@@ -803,6 +898,13 @@ function renderIcons() {
     card.id = 'icon-' + s.id;
     card.title = s.name;
     card.dataset.id = s.id;
+
+    // Apply border color (default white if not set, skip if transparent)
+    if (s.borderColor !== 'transparent') {
+      card.style.borderColor = s.borderColor || '#ffffff';
+      card.style.borderWidth = '3px';
+      card.style.borderStyle = 'solid';
+    }
 
     card.innerHTML = buildIconImg(s, 42) + `<span class="icon-name">${escHtml(s.name)}</span>`;
 
@@ -818,12 +920,18 @@ function renderWelcomeGrid() {
   grid.innerHTML = '';
 
   const isFavView = _currentCategory === 'favorites_folder' || _currentCategory === 'favorites_folder_2';
+  const isCategoryView = _currentCategory !== 'all' && !isFavView;
 
-  // Switch grid layout for favorites
+  // Switch grid layout for favorites and category views
   if (isFavView) {
     grid.classList.add('fav-view');
   } else {
     grid.classList.remove('fav-view');
+  }
+  if (isCategoryView) {
+    grid.classList.add('category-view');
+  } else {
+    grid.classList.remove('category-view');
   }
 
   if (_currentCategory === 'all') {
@@ -865,19 +973,26 @@ function renderWelcomeGrid() {
         item.className = 'welcome-icon-item fav-rectangular-item';
         const accentColor = s.color || '#e50914';
         const bgImageStyle = s.bgImage ? `background-image:url('${s.bgImage}');` : '';
+        const borderColor = s.borderColor !== 'transparent' ? `border-color:${s.borderColor || '#ffffff'};border-width:3px;border-style:solid;` : '';
         item.innerHTML = `
-          <div class="fav-rect-frame" style="--item-color:${accentColor};${bgImageStyle}">
+          <div class="fav-rect-frame" style="--item-color:${accentColor};${bgImageStyle}${borderColor}">
             <div class="fav-rect-overlay"></div>
             <span class="fav-rect-name">${escHtml(s.name)}</span>
           </div>
         `;
       } else {
         item.className = 'welcome-icon-item';
+        if (s.borderColor !== 'transparent') {
+          item.style.borderColor = s.borderColor || '#ffffff';
+          item.style.borderWidth = '3px';
+          item.style.borderStyle = 'solid';
+        }
         item.innerHTML = buildIconImg(s, 52) + `<span>${escHtml(s.name)}</span>`;
       }
       
       item.title = s.name;
       item.addEventListener('click', () => openSite(s));
+      item.addEventListener('contextmenu', e => openContextMenu(e, s.id));
       grid.appendChild(item);
     });
 
@@ -1094,6 +1209,7 @@ function goHome() {
   document.body.classList.remove('app-mode');
   // Always show back button if we are not at root home
   updateBackBtnVisibility();
+  renderIcons();
 
   const frame = document.getElementById('siteFrame');
   frame.src = '';
@@ -1142,8 +1258,11 @@ function openContextMenu(e, id) {
   menu.style.top = y + 'px';
 }
 function closeContextMenu() {
-  document.getElementById('contextMenu').classList.add('hidden');
-  ctxTargetId = null;
+  const menu = document.getElementById('contextMenu');
+  if (!menu.classList.contains('hidden')) {
+    menu.classList.add('hidden');
+    ctxTargetId = null;
+  }
 }
 function ctxEdit() {
   if (!ctxTargetId) return;
@@ -1164,6 +1283,174 @@ function ctxDelete() {
   }
   closeContextMenu();
 }
+
+function ctxBorderColor() {
+  if (!ctxTargetId) return;
+  const s = shortcuts.find(x => x.id === ctxTargetId);
+  if (!s) return;
+
+  const colors = [
+    { name: 'أخضر', value: '#00ff00' },
+    { name: 'أصفر', value: '#ffff00' },
+    { name: 'أحمر', value: '#ff0000' }
+  ];
+
+  const currentColor = (s.borderColor && s.borderColor !== 'transparent') ? s.borderColor : '';
+  const colorOptions = colors.map(c => 
+    `<button data-color="${c.value}" class="color-option-btn" style="background:${c.value};color:#000;padding:8px 16px;margin:4px;border-radius:4px;border:2px solid ${currentColor === c.value ? '#fff' : 'transparent'};cursor:pointer;position:relative;z-index:10002;">${c.name}</button>`
+  ).join('');
+
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.style.zIndex = '99999';
+  modal.style.pointerEvents = 'auto';
+  modal.style.position = 'fixed';
+  modal.style.inset = '0';
+  modal.style.display = 'flex';
+  modal.style.alignItems = 'center';
+  modal.style.justifyContent = 'center';
+
+  modal.innerHTML = `
+    <div class="modal" style="max-width:300px;pointer-events:auto;position:relative;z-index:100000;">
+      <h3>اختر لون الإطار</h3>
+      <div id="colorOptionsContainer" style="display:flex;flex-wrap:wrap;gap:8px;margin:16px 0;position:relative;z-index:100001;">
+        ${colorOptions}
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button id="cancelColorBtn" class="ctrl-btn" style="flex:1;">إلغاء</button>
+        <button id="removeColorBtn" class="ctrl-btn accent" style="flex:1;">إزالة اللون</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  // إضافة event listeners للأزرار
+  const colorOptionsContainer = modal.querySelector('#colorOptionsContainer');
+  colorOptionsContainer.addEventListener('click', function(e) {
+    const btn = e.target.closest('.color-option-btn');
+    if (btn) {
+      const color = btn.getAttribute('data-color');
+      setBorderColor(color);
+    }
+  });
+
+  modal.querySelector('#cancelColorBtn').addEventListener('click', function() {
+    modal.remove();
+  });
+
+  modal.querySelector('#removeColorBtn').addEventListener('click', function() {
+    removeBorderColor();
+  });
+
+  // إخفاء القائمة الجانبية فقط دون مسح ctxTargetId
+  document.getElementById('contextMenu').classList.add('hidden');
+}
+
+function setBorderColor(color) {
+  console.log('🎨 setBorderColor called with color:', color);
+  console.log('🔍 ctxTargetId:', ctxTargetId);
+  
+  if (!ctxTargetId) {
+    console.error('❌ ctxTargetId is null');
+    return;
+  }
+  
+  const s = shortcuts.find(x => x.id === ctxTargetId);
+  console.log('🔍 Found shortcut:', s);
+  
+  if (s) {
+    s.borderColor = color;
+    console.log('✅ borderColor set to:', color);
+    
+    saveShortcuts();
+    console.log('✅ Shortcuts saved');
+    
+    renderIcons();
+    console.log('✅ Icons rendered');
+    
+    renderWelcomeGrid();
+    console.log('✅ Welcome grid rendered');
+    
+    showToast(`✅ تم تغيير لون الإطار إلى ${color}`);
+    
+    // إغلاق modal بشكل صحيح
+    const modal = document.getElementById('colorPickerModal');
+    if (modal) {
+      modal.classList.add('hidden');
+      console.log('✅ Modal closed');
+    }
+  } else {
+    console.error('❌ Shortcut not found with id:', ctxTargetId);
+    showToast(`❌ لم يتم العثور على العنصر`);
+  }
+}
+
+function removeBorderColor() {
+  if (!ctxTargetId) return;
+  const s = shortcuts.find(x => x.id === ctxTargetId);
+  if (s) {
+    s.borderColor = 'transparent';
+    saveShortcuts();
+    renderIcons();
+    renderWelcomeGrid();
+    showToast(`✅ تم إزالة لون الإطار`);
+  }
+  const modal = document.getElementById('colorPickerModal');
+  if (modal) {
+    modal.classList.add('hidden');
+  }
+}
+
+// ── Color Picker Functions ─────────────────────────────────────────────
+function openColorPicker() {
+  console.log('🎨 openColorPicker called, ctxTargetId:', ctxTargetId);
+  if (!ctxTargetId) {
+    showToast('❌ لم يتم تحديد عنصر');
+    return;
+  }
+  const s = shortcuts.find(x => x.id === ctxTargetId);
+  if (!s) {
+    showToast('❌ لم يتم العثور على العنصر');
+    return;
+  }
+
+  const modal = document.getElementById('colorPickerModal');
+  const colorOptionsContainer = document.getElementById('colorOptions');
+  
+  if (!modal || !colorOptionsContainer) {
+    console.error('❌ Modal or container not found');
+    return;
+  }
+
+  // إعادة بناء الأزرار 
+  const colors = ['#ffffff', '#00ff00', '#ff00ff', '#0000ff', '#ffff00', '#ffa500', '#ff0000'];
+  
+  let html = '';
+  colors.forEach((color, idx) => {
+    const isSelected = s.borderColor === color;
+    const styleStr = isSelected ? `border-color:#ffffff !important;box-shadow:0 0 8px ${color} !important;` : 'border-color:transparent;box-shadow:none;';
+    // استخدام onmouseup لضمان الاستجابة
+    html += `<button type="button" data-color="${color}" onmouseup="window.colorPickerHandler('${color}')" style="width:60px;height:60px;border-radius:8px;background:${color};border:3px solid;cursor:pointer;${styleStr}"></button>`;
+  });
+  
+  colorOptionsContainer.innerHTML = html;
+  console.log('✅ HTML injected, button count:', colorOptionsContainer.querySelectorAll('button').length);
+
+  modal.classList.remove('hidden');
+  document.getElementById('contextMenu').classList.add('hidden');
+  console.log('✅ Color picker modal shown');
+}
+
+function closeColorPicker() {
+  document.getElementById('colorPickerModal').classList.add('hidden');
+}
+
+// Global handler for color picker
+window.colorPickerHandler = function(color) {
+  console.log('🎨 colorPickerHandler called with color:', color);
+  setBorderColor(color);
+};
 
 // ── Modal: Add ────────────────────────────────────────────────────────
 function openAddModal() {
@@ -1273,7 +1560,8 @@ function saveShortcut() {
       categoryId,
       image: currentIconImage,
       bgImage: bgImage || null,
-      emoji: name.charAt(0).toUpperCase()
+      emoji: name.charAt(0).toUpperCase(),
+      borderColor: '#ffffff'
     });
   }
 
@@ -1590,3 +1878,40 @@ function quickDeleteSite(siteId) {
     }
   }
 }
+
+// إضافة event listeners لأزرار الألوان
+function handleColorClick(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  const color = e.target.getAttribute('data-color');
+  console.log('Color clicked:', color); // للتصحيح
+  if (color) {
+    setBorderColor(color);
+  }
+}
+
+function initColorPicker() {
+  const colorOptions = document.querySelectorAll('.color-option');
+  console.log('Found color options:', colorOptions.length); // للتصحيح
+  colorOptions.forEach(btn => {
+    // إزالة أي event listeners سابقة
+    const newBtn = btn.cloneNode(true);
+    btn.parentNode.replaceChild(newBtn, btn);
+    // إضافة event listener جديد
+    newBtn.addEventListener('click', handleColorClick);
+  });
+}
+
+// تهيئة اختيار اللون عند تحميل الصفحة
+document.addEventListener('DOMContentLoaded', function() {
+  console.log('DOM loaded, initializing color picker'); // للتصحيح
+  initColorPicker();
+});
+
+// إعادة تهيئة عند فتح نافذة اختيار اللون
+const originalOpenColorPicker = openColorPicker;
+openColorPicker = function() {
+  console.log('Opening color picker'); // للتصحيح
+  originalOpenColorPicker();
+  setTimeout(initColorPicker, 100);
+};
