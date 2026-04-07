@@ -31,6 +31,8 @@ body {
   background: var(--bg);
   color: var(--text);
   -webkit-overflow-scrolling: touch; /* Smooth iOS scroll */
+  /* Performance optimizations for scrolling */
+  scroll-behavior: auto; /* Disable smooth scrolling for better performance */
 }
 
 .hidden {
@@ -105,6 +107,121 @@ html {
 * {
   -webkit-overflow-scrolling: touch;
   scroll-behavior: smooth;
+}
+
+/* ===== TITLE BAR ===== */
+#titleBar {
+  position: fixed;
+  top: var(--bar-h);
+  left: 0;
+  right: 0;
+  height: 60px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--glass-border);
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  z-index: 100;
+  backdrop-filter: blur(10px);
+}
+
+.title-bar-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.title-back-btn {
+  background: linear-gradient(135deg, var(--accent), #ff6b6b);
+  border: 2px solid var(--accent);
+  color: #fff;
+  cursor: pointer;
+  padding: 8px 12px;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(229, 9, 20, 0.3);
+  font-weight: 600;
+}
+
+.title-back-btn:hover {
+  background: linear-gradient(135deg, #ff6b6b, var(--accent));
+  border-color: #ff6b6b;
+  transform: translateY(-1px) scale(1.05);
+  box-shadow: 0 4px 16px rgba(229, 9, 20, 0.5);
+}
+
+.title-back-btn:active {
+  transform: translateY(0) scale(0.98);
+  box-shadow: 0 1px 4px rgba(229, 9, 20, 0.3);
+}
+
+.title-back-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+#appTitle {
+  font-size: 1.8rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, #fff 30%, var(--accent));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin: 0;
+}
+
+#categoryTitle {
+  font-size: 1.2rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+@media screen and (max-width: 768px) {
+  #titleBar {
+    height: 45px;
+    padding: 0 12px;
+  }
+  
+  #appTitle {
+    font-size: 1.3rem;
+  }
+  
+  #categoryTitle {
+    font-size: 0.9rem;
+  }
+  
+  .title-back-btn {
+    padding: 6px 8px;
+    border-radius: 6px;
+  }
+  
+  .title-back-btn svg {
+    width: 16px;
+    height: 16px;
+  }
+  
+  #welcomeScreen {
+    min-height: calc(100vh - 75px - 45px);
+    margin-top: calc(75px + 45px);
+  }
+  
+  #welcomeScreen.category-view,
+  #welcomeScreen.home-view {
+    margin-top: calc(75px + 45px);
+    min-height: calc(100vh - 75px - 45px);
+  }
+  
+  #welcomeIconsGrid {
+    max-height: calc(100vh - 75px - 45px);
+  }
+  
+  #welcomeScreen.category-view #welcomeIconsGrid {
+    max-height: calc(100vh - 75px - 45px);
+  }
 }
 
 /* ===== TOP BAR ===== */
@@ -373,13 +490,25 @@ html {
 /* Specific fix for welcomeScreen to allow scrolling */
 #welcomeScreen {
   position: relative; /* Change from fixed to relative to allow natural scrolling */
-  min-height: calc(100vh - var(--bar-h));
-  margin-top: var(--bar-h);
+  min-height: calc(100vh - var(--bar-h) - 60px); /* Subtract title bar height */
+  margin-top: calc(var(--bar-h) + 60px); /* Add title bar height */
   display: flex;
-  align-items: flex-start; /* Start from top */
-  justify-content: center;
+  flex-direction: column;
+  align-items: center; /* Center horizontally */
   overflow-y: visible;
   padding-bottom: 40px;
+}
+
+/* Hide welcome content when in category/folder view or home view */
+#welcomeScreen.category-view .welcome-content,
+#welcomeScreen.home-view .welcome-content {
+  display: none;
+}
+
+#welcomeScreen.category-view,
+#welcomeScreen.home-view {
+  margin-top: calc(var(--bar-h) + 60px);
+  min-height: calc(100vh - var(--bar-h) - 60px);
 }
 
 .welcome-content {
@@ -439,13 +568,25 @@ html {
 
 #welcomeIconsGrid {
   display: flex;
+  flex: 1; /* Take remaining space */
   flex-wrap: wrap; /* Restore wrapping for mobile to see all items */
   gap: 12px;
   justify-content: center;
   max-width: 100%;
   padding: 10px;
+  width: 100%;
+  /* Performance optimizations */
+  contain: layout style paint; /* CSS containment for better performance */
+}
+
+#welcomeScreen.category-view #welcomeIconsGrid,
+#welcomeScreen.home-view #welcomeIconsGrid {
+  padding: 20px 16px;
+}
+
+#welcomeScreen.category-view,
+#welcomeScreen.home-view {
   overflow-y: auto;
-  max-height: 70vh;
 }
 
 @media screen and (min-width: 769px) {
@@ -491,6 +632,9 @@ html {
   backdrop-filter: blur(10px);
   min-width: 100px;
   transition: transform var(--trans), box-shadow var(--trans), background var(--trans);
+  /* Performance optimizations */
+  will-change: transform, opacity;
+  transform: translateZ(0); /* Force hardware acceleration */
 }
 
 .welcome-icon-item:hover {
@@ -522,6 +666,80 @@ html {
   font-size: 15px;
   font-weight: 900;
   color: var(--text-muted);
+}
+
+/* Item numbering */
+.item-number {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background: var(--accent);
+  color: white;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: bold;
+  z-index: 10;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+/* Pagination controls */
+.pagination-controls {
+  background: var(--glass);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  border: 1px solid var(--glass-border);
+}
+
+.pagination-btn {
+  background: var(--bg2);
+  color: var(--text);
+  border: 1px solid var(--glass-border);
+  border-radius: 6px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: all var(--trans);
+  font-family: 'Cairo', sans-serif;
+  font-size: 14px;
+  min-width: 40px;
+  /* Performance optimizations */
+  will-change: transform, background-color;
+  transform: translateZ(0); /* Force hardware acceleration */
+}
+
+.pagination-btn:hover:not(:disabled) {
+  background: var(--accent);
+  color: white;
+  transform: translateY(-1px);
+}
+
+.pagination-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pagination-btn.active {
+  background: var(--accent);
+  color: white;
+  font-weight: bold;
+}
+
+/* Draggable items */
+.draggable-item {
+  position: relative;
+  cursor: grab;
+}
+
+.draggable-item:active {
+  cursor: grabbing;
+}
+
+.draggable-item:hover {
+  transform: translateY(-8px) scale(1.05);
 }
 
 /* Background orbs */
@@ -1214,6 +1432,9 @@ body.app-mode #viewerWrapper {
   align-items: unset;
   flex-wrap: unset;
   justify-content: unset;
+  /* Performance optimizations */
+  will-change: scroll-position;
+  contain: layout style paint;
 }
 
 #welcomeIconsGrid.category-view .welcome-icon-item {
@@ -1250,10 +1471,12 @@ body.app-mode #viewerWrapper {
   backdrop-filter: blur(14px);
   border: 2px solid var(--item-color);
   border-radius: 12px;
-  transition: all 0.3s ease;
+  transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease, border-width 0.3s ease;
   box-shadow: 0 4px 16px rgba(0,0,0,0.25);
   position: relative;
   overflow: hidden;
+  will-change: transform, box-shadow;
+  transform: translateZ(0); /* Force hardware acceleration */
 }
 
 .fav-rect-overlay {
@@ -1285,7 +1508,7 @@ body.app-mode #viewerWrapper {
   border-color: var(--item-color);
   border-width: 3px;
   box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 0 0 2px var(--item-color);
-  transform: translateY(-4px) scale(1.02);
+  transform: translateY(-4px) scale(1.02) translateZ(0);
 }
 
 .welcome-icon-item.fav-rectangular-item:hover .fav-rect-overlay {

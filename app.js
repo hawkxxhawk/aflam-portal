@@ -78,6 +78,9 @@ let _navigationStack = ['all']; // Track category history for back button
 let editingId = null;
 let ctxTargetId = null;
 let currentIconImage = null;
+let _sortOrder = 'newest'; // 'newest' or 'oldest' - default to newest first
+let _currentPage = 1; // Current page for pagination
+const ITEMS_PER_PAGE = 20; // Items per page - reduced for better performance
 
 // ── Data loading strategy ─────────────────────────────────────────────
 // Priority: localStorage / IndexedDB quick snapshot > initial bundle file > full chunk refresh
@@ -258,6 +261,9 @@ async function backgroundRefreshFromChunks(preserveLocal = false, showToasts = t
     categories = uniqueCats;
 
     shortcuts.forEach(s => { if (!s.categoryId) s.categoryId = 'general'; });
+    
+    // Ensure all shortcuts have order property
+    ensureShortcutOrders();
 
     await saveShortcuts();
     renderCategorySelector();
@@ -358,6 +364,9 @@ async function exportFavorites2Only() {
 
 async function initApp() {
   try {
+    // Load user preferences
+    _sortOrder = localStorage.getItem('rm_sort_order') || 'newest';
+
     // 1. Load system categories first
     if (!categories.some(c => c.id === 'favorites_folder')) {
       categories.push({ id: 'favorites_folder', name: 'المفضلة', isSystem: true });
@@ -432,6 +441,7 @@ async function initApp() {
     renderIcons();
     renderWelcomeGrid();
     updateBackBtnVisibility();
+    updateSortOrderButton(); // Update sort order button text
     setupEventListeners();
     _updateGlobalModeUI();
 
@@ -637,6 +647,31 @@ async function saveShortcuts() {
   } catch (e) {
     console.warn("LocalStorage save failed, relying on IndexedDB only.");
   }
+}
+
+// ── Ensure shortcuts have order property ──────────────────────────────
+function ensureShortcutOrders() {
+  // Group shortcuts by category
+  const categoryGroups = {};
+  shortcuts.forEach(s => {
+    if (!categoryGroups[s.categoryId]) categoryGroups[s.categoryId] = [];
+    categoryGroups[s.categoryId].push(s);
+  });
+
+  // For each category, ensure order property exists and is sequential
+  Object.keys(categoryGroups).forEach(catId => {
+    const catShortcuts = categoryGroups[catId];
+    // Sort by existing order if available, otherwise by creation time (id)
+    catShortcuts.sort((a, b) => {
+      if (a.order !== undefined && b.order !== undefined) return a.order - b.order;
+      return a.id.localeCompare(b.id);
+    });
+    
+    // Assign sequential orders
+    catShortcuts.forEach((s, index) => {
+      s.order = index;
+    });
+  });
 }
 
 // ── Export / Import data.json ─────────────────────────────────────────
@@ -887,7 +922,7 @@ function showToast(msg) {
 function renderIcons() {
   const container = document.getElementById('iconsContainer');
   const strip = document.getElementById('iconsStrip');
-  if (strip) strip.classList.toggle('hidden', _currentCategory === 'all');
+  if (strip) strip.classList.toggle('hidden', _currentCategory !== 'all');
   container.innerHTML = '';
 
   const filtered = _currentCategory === 'all' ? shortcuts : shortcuts.filter(s => s.categoryId === _currentCategory);
@@ -954,49 +989,96 @@ function renderWelcomeGrid() {
     });
   } else {
     // Inside a specific category
-    const backItem = document.createElement('div');
-    backItem.className = 'welcome-icon-item back-item';
-    backItem.title = 'العودة للمجلدات';
-    backItem.innerHTML = `
-      <div class="icon-fallback" style="width:52px;height:52px;border-radius:12px;background:rgba(255,255,255,0.1);font-size:24px;">🔙</div>
-      <span>رجوع</span>
-    `;
-    backItem.addEventListener('click', () => goBackView());
-    grid.appendChild(backItem);
-
-    const filtered = shortcuts.filter(s => s.categoryId === _currentCategory);
-    filtered.forEach(s => {
+    let filtered = shortcuts.filter(s => s.categoryId === _currentCategory);
+    
+    // Sort by date added (newest or oldest first), then by order if dates are equal
+    filtered.sort((a, b) => {
+      const aTime = parseInt(a.id.split('_')[1]) || 0;
+      const bTime = parseInt(b.id.split('_')[1]) || 0;
+      if (aTime !== bTime) {
+        return _sortOrder === 'newest' ? bTime - aTime : aTime - bTime; // Newest or oldest first
+      }
+      return (a.order || 0) - (b.order || 0); // Fallback to order
+    });
+    
+    const isFavView = _currentCategory === 'favorites_folder' || _currentCategory === 'favorites_folder_2';
+    const itemsPerPage = isFavView ? 20 : ITEMS_PER_PAGE; // Fewer items for favorites for better performance
+    
+    const totalItems = filtered.length;
+    const totalPages = Math.ceil(totalItems / itemsPerPage);
+    
+    // Ensure current page is valid
+    if (_currentPage > totalPages) _currentPage = totalPages;
+    if (_currentPage < 1) _currentPage = 1;
+    
+    // Get items for current page
+    const startIndex = (_currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const pageItems = filtered.slice(startIndex, endIndex);
+    
+    // Add pagination controls if needed
+    if (totalPages > 1) {
+      const paginationControls = createPaginationControls(totalPages);
+      grid.appendChild(paginationControls);
+    }
+    
+    // Render items with numbering using DocumentFragment for better performance
+    const fragment = document.createDocumentFragment();
+    pageItems.forEach((s, index) => {
+      const globalIndex = startIndex + index + 1; // 1-based global numbering
+      
       const item = document.createElement('div');
+      item.className = 'welcome-icon-item draggable-item';
+      item.title = s.name;
+      item.dataset.id = s.id;
+      item.draggable = true;
       
       if (isFavView) {
         // Movie Card Style for Favorites with background image
-        item.className = 'welcome-icon-item fav-rectangular-item';
         const accentColor = s.color || '#e50914';
         const bgImageStyle = s.bgImage ? `background-image:url('${s.bgImage}');` : '';
         const borderColor = s.borderColor !== 'transparent' ? `border-color:${s.borderColor || '#ffffff'};border-width:3px;border-style:solid;` : '';
         item.innerHTML = `
+          <div class="item-number">${globalIndex}</div>
           <div class="fav-rect-frame" style="--item-color:${accentColor};${bgImageStyle}${borderColor}">
             <div class="fav-rect-overlay"></div>
             <span class="fav-rect-name">${escHtml(s.name)}</span>
           </div>
         `;
       } else {
-        item.className = 'welcome-icon-item';
         if (s.borderColor !== 'transparent') {
           item.style.borderColor = s.borderColor || '#ffffff';
           item.style.borderWidth = '3px';
           item.style.borderStyle = 'solid';
         }
-        item.innerHTML = buildIconImg(s, 52) + `<span>${escHtml(s.name)}</span>`;
+        item.innerHTML = `
+          <div class="item-number">${globalIndex}</div>
+          ${buildIconImg(s, 52)}
+          <span>${escHtml(s.name)}</span>
+        `;
       }
       
-      item.title = s.name;
+      // Add event listeners immediately for better performance
+      item.addEventListener('dragstart', handleItemDragStart);
+      item.addEventListener('dragend', handleItemDragEnd);
+      item.addEventListener('dragover', handleItemDragOver);
+      item.addEventListener('drop', handleItemDrop);
       item.addEventListener('click', () => openSite(s));
       item.addEventListener('contextmenu', e => openContextMenu(e, s.id));
-      grid.appendChild(item);
+      
+      fragment.appendChild(item);
     });
+    
+    // Add all items at once
+    grid.appendChild(fragment);
+    
+    // Add pagination controls at bottom if needed
+    if (totalPages > 1) {
+      const paginationControlsBottom = createPaginationControls(totalPages);
+      grid.appendChild(paginationControlsBottom);
+    }
 
-    if (filtered.length === 0) {
+    if (totalItems === 0) {
       const emptyMsg = document.createElement('div');
       emptyMsg.style.cssText = 'grid-column: 1/-1; padding: 20px; color: var(--text-muted); font-size: 14px;';
       emptyMsg.textContent = 'لا توجد مواقع في هذا المجلد بعد.';
@@ -1020,6 +1102,189 @@ function buildIconImg(s, size) {
   return `<div class="icon-fallback" style="width:${size}px;height:${size}px;border-radius:${size * 0.23}px;background:${s.color || '#333'};${bgStyle}font-size:${fontSize}px;">${letter}</div>`;
 }
 
+// ── Create pagination controls ─────────────────────────────────────────
+function createPaginationControls(totalPages) {
+  const controls = document.createElement('div');
+  controls.className = 'pagination-controls';
+  controls.style.cssText = `
+    grid-column: 1/-1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 16px;
+    margin: 10px 0;
+  `;
+  
+  // Previous button
+  const prevBtn = document.createElement('button');
+  prevBtn.className = 'pagination-btn';
+  prevBtn.innerHTML = '⬅️';
+  prevBtn.disabled = _currentPage <= 1;
+  prevBtn.onclick = () => changePage(_currentPage - 1);
+  controls.appendChild(prevBtn);
+  
+  // Page numbers
+  const startPage = Math.max(1, _currentPage - 2);
+  const endPage = Math.min(totalPages, _currentPage + 2);
+  
+  if (startPage > 1) {
+    const firstBtn = document.createElement('button');
+    firstBtn.className = 'pagination-btn';
+    firstBtn.textContent = '1';
+    firstBtn.onclick = () => changePage(1);
+    controls.appendChild(firstBtn);
+    
+    if (startPage > 2) {
+      const dots = document.createElement('span');
+      dots.textContent = '...';
+      dots.style.color = 'var(--text-muted)';
+      controls.appendChild(dots);
+    }
+  }
+  
+  for (let i = startPage; i <= endPage; i++) {
+    const pageBtn = document.createElement('button');
+    pageBtn.className = 'pagination-btn';
+    if (i === _currentPage) pageBtn.classList.add('active');
+    pageBtn.textContent = i;
+    pageBtn.onclick = () => changePage(i);
+    controls.appendChild(pageBtn);
+  }
+  
+  if (endPage < totalPages) {
+    if (endPage < totalPages - 1) {
+      const dots = document.createElement('span');
+      dots.textContent = '...';
+      dots.style.color = 'var(--text-muted)';
+      controls.appendChild(dots);
+    }
+    
+    const lastBtn = document.createElement('button');
+    lastBtn.className = 'pagination-btn';
+    lastBtn.textContent = totalPages;
+    lastBtn.onclick = () => changePage(totalPages);
+    controls.appendChild(lastBtn);
+  }
+  
+  // Next button
+  const nextBtn = document.createElement('button');
+  nextBtn.className = 'pagination-btn';
+  nextBtn.innerHTML = '➡️';
+  nextBtn.disabled = _currentPage >= totalPages;
+  nextBtn.onclick = () => changePage(_currentPage + 1);
+  controls.appendChild(nextBtn);
+  
+  return controls;
+}
+
+// ── Change page ───────────────────────────────────────────────────────
+function changePage(page) {
+  _currentPage = page;
+  renderWelcomeGrid();
+  // Scroll to top instantly for better performance
+  window.scrollTo(0, 0);
+}
+
+// ── Drag and drop handlers ────────────────────────────────────────────
+let draggedElement = null;
+
+function handleItemDragStart(e) {
+  draggedElement = e.target.closest('.draggable-item');
+  if (!draggedElement) return;
+  draggedElement.style.opacity = '0.5';
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', draggedElement.dataset.id);
+}
+
+function handleItemDragEnd(e) {
+  const item = e.target.closest('.draggable-item');
+  if (item) item.style.opacity = '1';
+  draggedElement = null;
+  document.querySelectorAll('.draggable-item').forEach(item => {
+    item.style.borderLeft = '';
+    item.style.borderRight = '';
+  });
+}
+
+function handleItemDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  
+  const target = e.target.closest('.draggable-item');
+  if (target && target !== draggedElement) {
+    const rect = target.getBoundingClientRect();
+    const midpoint = rect.left + rect.width / 2;
+    
+    if (e.clientX < midpoint) {
+      target.style.borderLeft = '3px solid var(--accent)';
+      target.style.borderRight = '';
+    } else {
+      target.style.borderRight = '3px solid var(--accent)';
+      target.style.borderLeft = '';
+    }
+  }
+}
+
+function handleItemDrop(e) {
+  e.preventDefault();
+  
+  const target = e.target.closest('.draggable-item');
+  if (!target || !draggedElement || target === draggedElement) return;
+  
+  // Reset border styles
+  document.querySelectorAll('.draggable-item').forEach(item => {
+    item.style.borderLeft = '';
+    item.style.borderRight = '';
+  });
+  
+  const draggedId = draggedElement.dataset.id;
+  const targetId = target.dataset.id;
+  
+  if (draggedId === targetId) return;
+  
+  // Find the shortcuts
+  const draggedShortcut = shortcuts.find(s => s.id === draggedId);
+  const targetShortcut = shortcuts.find(s => s.id === targetId);
+  
+  if (!draggedShortcut || !targetShortcut || draggedShortcut.categoryId !== targetShortcut.categoryId) return;
+  
+  // Determine drop position
+  const rect = target.getBoundingClientRect();
+  const midpoint = rect.left + rect.width / 2;
+  const insertBefore = e.clientX < midpoint;
+  
+  // Get all shortcuts in the category
+  const categoryShortcuts = shortcuts.filter(s => s.categoryId === _currentCategory).sort((a, b) => (a.order || 0) - (b.order || 0));
+  
+  // Find indices
+  const draggedIndex = categoryShortcuts.findIndex(s => s.id === draggedId);
+  const targetIndex = categoryShortcuts.findIndex(s => s.id === targetId);
+  
+  // Remove dragged item
+  categoryShortcuts.splice(draggedIndex, 1);
+  
+  // Insert at new position
+  let newIndex = targetIndex;
+  if (!insertBefore && draggedIndex < targetIndex) {
+    newIndex = targetIndex;
+  } else if (insertBefore && draggedIndex > targetIndex) {
+    newIndex = targetIndex;
+  } else if (!insertBefore) {
+    newIndex = targetIndex + 1;
+  }
+  
+  categoryShortcuts.splice(newIndex, 0, draggedShortcut);
+  
+  // Update orders
+  categoryShortcuts.forEach((s, index) => {
+    s.order = index;
+  });
+  
+  ensureShortcutOrders();
+  saveShortcuts();
+  renderWelcomeGrid();
+}
 // ── Current site ref for viewer toolbar ──────────────────────────────
 let _currentSite = null;
 let _blockDetectTimer = null;
@@ -1194,6 +1459,13 @@ function goHome() {
   
   document.getElementById('currentCategoryLabel').textContent = 'كل المواقع';
 
+  // Show title bar and hide back button
+  document.getElementById('titleBar').classList.remove('hidden');
+  document.getElementById('titleBackBtn').classList.add('hidden');
+  document.getElementById('categoryTitle').textContent = '';
+  document.getElementById('welcomeScreen').classList.remove('category-view');
+  document.getElementById('welcomeScreen').classList.add('home-view');
+
   _currentSite = null;
   document.querySelectorAll('.icon-card').forEach(c => c.classList.remove('active'));
   document.getElementById('currentSiteLabel').textContent = '';
@@ -1216,6 +1488,39 @@ function goHome() {
   
   renderIcons();
   renderWelcomeGrid();
+  updateSortOrderButton(); // Update sort button visibility
+}
+
+// ── Toggle sort order ────────────────────────────────────────────────
+function toggleSortOrder() {
+  _sortOrder = _sortOrder === 'newest' ? 'oldest' : 'newest';
+  localStorage.setItem('rm_sort_order', _sortOrder);
+  updateSortOrderButton();
+  renderWelcomeGrid();
+  showToast(`✅ تم تغيير الترتيب إلى: ${_sortOrder === 'newest' ? 'الأحدث أولاً' : 'الأقدم أولاً'}`);
+}
+
+// ── Update sort order button ──────────────────────────────────────────
+function updateSortOrderButton() {
+  const label = document.getElementById('sortOrderLabel');
+  const icon = document.getElementById('sortOrderIcon');
+  const btn = document.getElementById('sortOrderBtn');
+  
+  if (label) {
+    label.textContent = _sortOrder === 'newest' ? 'الأحدث' : 'الأقدم';
+  }
+  
+  if (icon) {
+    // Rotate icon based on sort order with smooth transition
+    icon.style.transition = 'transform 0.3s ease';
+    icon.style.transform = _sortOrder === 'newest' ? 'rotate(0deg)' : 'rotate(180deg)';
+  }
+  
+  if (btn) {
+    btn.title = `ترتيب العناصر: ${_sortOrder === 'newest' ? 'الأحدث أولاً' : 'الأقدم أولاً'}`;
+    // Show button only when in a category/folder view
+    btn.style.display = _currentCategory !== 'all' ? 'flex' : 'none';
+  }
 }
 
 function updateBackBtnVisibility() {
@@ -1462,8 +1767,26 @@ function openAddModal() {
   document.getElementById('siteColor').value = '#1a1a2e';
   document.getElementById('colorPreviewText').textContent = '#1a1a2e';
   document.getElementById('siteBgImage').value = '';
+  
+  // Auto-select current category (if not in 'all' view)
+  const categorySelect = document.getElementById('siteCategory');
+  let autoSelectedCategory = false;
+  
+  if (_currentCategory !== 'all' && categories.some(c => c.id === _currentCategory)) {
+    categorySelect.value = _currentCategory;
+    autoSelectedCategory = true;
+  } else {
+    categorySelect.value = 'general';
+  }
+  
   resetIconPreview();
   showModal();
+  
+  // Show toast notification only if auto-selected a category
+  if (autoSelectedCategory) {
+    const categoryName = categories.find(c => c.id === _currentCategory)?.name || _currentCategory;
+    showToast(`✅ تم تحديد المجلد: ${categoryName}`);
+  }
 }
 
 // ── Modal: Edit ───────────────────────────────────────────────────────
@@ -1538,6 +1861,7 @@ function saveShortcut() {
     // Update existing
     const idx = shortcuts.findIndex(x => x.id === editingId);
     if (idx !== -1) {
+      const oldCategory = shortcuts[idx].categoryId;
       shortcuts[idx] = {
         ...shortcuts[idx],
         name,
@@ -1548,10 +1872,16 @@ function saveShortcut() {
         bgImage: bgImage || null,
         emoji: shortcuts[idx].emoji || name.charAt(0).toUpperCase()
       };
+      if (oldCategory !== categoryId) {
+        ensureShortcutOrders();
+      }
     }
   } else {
     // Create new
     const id = 'site_' + Date.now();
+    // Find the maximum order in the category
+    const categoryShortcuts = shortcuts.filter(s => s.categoryId === categoryId);
+    const maxOrder = categoryShortcuts.length > 0 ? Math.max(...categoryShortcuts.map(s => s.order || 0)) : -1;
     shortcuts.push({
       id,
       name,
@@ -1561,10 +1891,12 @@ function saveShortcut() {
       image: currentIconImage,
       bgImage: bgImage || null,
       emoji: name.charAt(0).toUpperCase(),
-      borderColor: '#ffffff'
+      borderColor: '#ffffff',
+      order: maxOrder + 1
     });
   }
 
+  ensureShortcutOrders();
   saveShortcuts();
   renderIcons();
   renderWelcomeGrid();
@@ -1642,6 +1974,7 @@ function toggleCategorySelectMenu() {
 
 function selectCategory(id) {
   _currentCategory = id;
+  _currentPage = 1; // Reset to first page when entering category
   
   // Update navigation stack
   if (_navigationStack[_navigationStack.length - 1] !== id) {
@@ -1651,6 +1984,26 @@ function selectCategory(id) {
   const label = id === 'all' ? 'كل المواقع' : (categories.find(c => c.id === id)?.name || 'كل المواقع');
   document.getElementById('currentCategoryLabel').textContent = label;
   
+  // Update title bar
+  const titleBar = document.getElementById('titleBar');
+  const categoryTitle = document.getElementById('categoryTitle');
+  const titleBackBtn = document.getElementById('titleBackBtn');
+  
+  // Always show title bar
+  titleBar.classList.remove('hidden');
+  
+  if (id === 'all') {
+    categoryTitle.textContent = '';
+    titleBackBtn.classList.add('hidden');
+    document.getElementById('welcomeScreen').classList.remove('category-view');
+    document.getElementById('welcomeScreen').classList.add('home-view');
+  } else {
+    categoryTitle.textContent = label;
+    titleBackBtn.classList.remove('hidden');
+    document.getElementById('welcomeScreen').classList.add('category-view');
+    document.getElementById('welcomeScreen').classList.remove('home-view');
+  }
+  
   // Close menu if open
   const cm = document.getElementById('categorySelectMenu');
   if (cm) cm.classList.add('hidden');
@@ -1658,6 +2011,7 @@ function selectCategory(id) {
   renderIcons();
   renderWelcomeGrid();
   updateBackBtnVisibility();
+  updateSortOrderButton(); // Update sort button visibility and state
   
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }

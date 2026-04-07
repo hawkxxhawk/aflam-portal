@@ -81,6 +81,14 @@
     </div>
 
     <div id="barRight">
+      <!-- Sort Order Toggle -->
+      <button id="sortOrderBtn" class="ctrl-btn" title="ترتيب العناصر: الأحدث/الأقدم" onclick="toggleSortOrder()">
+        <svg id="sortOrderIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+        </svg>
+        <span id="sortOrderLabel">الأحدث</span>
+      </button>
+
       <!-- Add Site -->
       <button id="addBtn" class="ctrl-btn accent" title="إضافة موقع جديد" onclick="openAddModal()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -193,6 +201,19 @@
 
   </header>
 
+  <!-- ===== TITLE BAR ===== -->
+  <div id="titleBar" class="hidden">
+    <div class="title-bar-content">
+      <button id="titleBackBtn" class="title-back-btn hidden" onclick="goBackView()" title="رجوع">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 12H5M12 19l-7-7 7-7" />
+        </svg>
+      </button>
+      <h1 id="appTitle">🎬 بوابة الأفلام</h1>
+      <div id="categoryTitle"></div>
+    </div>
+  </div>
+
   <div id="updateProgressWrapper" class="hidden">
     <div id="updateProgressLabel">جاري تحديث البيانات في الخلفية...</div>
     <div id="updateProgressBarOuter">
@@ -206,8 +227,8 @@
       <div class="welcome-logo">🎬</div>
       <h1>بوابة الأفلام</h1>
       <p>اختر موقعاً من الشريط العلوي للبدء، أو أضف موقعاً جديداً</p>
-      <div id="welcomeIconsGrid"></div>
     </div>
+    <div id="welcomeIconsGrid"></div>
     <div class="bg-orbs">
       <div class="orb orb1"></div>
       <div class="orb orb2"></div>
