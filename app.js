@@ -226,9 +226,9 @@ async function backgroundRefreshFromChunks(preserveLocal = false, showToasts = t
       }
     }
 
-    if (Array.isArray(disk.shortcuts) && !shortcuts.some(s => s.categoryId === 'favorites_folder')) {
+    if (Array.isArray(disk.shortcuts) && !shortcuts.some(s => ['favorites_folder', 'favorites_folder_2', 'favorites_folder_3'].includes(s.categoryId))) {
       const chunkFavs = await loadFavoritesFromChunks();
-      shortcuts = [...shortcuts.filter(s => s.categoryId !== 'favorites_folder' && s.categoryId !== 'favorites_folder_2'), ...chunkFavs.favs1, ...chunkFavs.favs2];
+      shortcuts = [...shortcuts.filter(s => s.categoryId !== 'favorites_folder' && s.categoryId !== 'favorites_folder_2' && s.categoryId !== 'favorites_folder_3'), ...chunkFavs.favs1, ...chunkFavs.favs2, ...chunkFavs.favs3];
     }
 
     if (disk.iptv_sources && typeof IPTV_DB !== 'undefined') {
@@ -295,6 +295,7 @@ async function loadFavoritesFromFile() {
 async function loadFavoritesFromChunks() {
   let favs1 = [];
   let favs2 = [];
+  let favs3 = [];
 
   try {
     const fav1Res = await fetch('./database_chunks/favourit.json?_=' + Date.now());
@@ -316,7 +317,17 @@ async function loadFavoritesFromChunks() {
     }
   } catch (e) { console.warn("Failed to load favourit2.json from chunks:", e); }
 
-  return { favs1, favs2 };
+  try {
+    const fav3Res = await fetch('./database_chunks/favourit3.json?_=' + Date.now());
+    if (fav3Res.ok) {
+      const fav3Data = await fav3Res.json();
+      if (Array.isArray(fav3Data)) {
+        favs3 = fav3Data.map(f => ({ ...f, categoryId: 'favorites_folder_3', isExternalFav: true }));
+      }
+    }
+  } catch (e) { console.warn("Failed to load favourit3.json from chunks:", e); }
+
+  return { favs1, favs2, favs3 };
 }
 
 async function loadFavorites2FromFile() {
@@ -329,6 +340,19 @@ async function loadFavorites2FromFile() {
       }
     }
   } catch (e) { console.warn("favourit2.json not found."); }
+  return [];
+}
+
+async function loadFavorites3FromFile() {
+  try {
+    const res = await fetch('./favourit3.json?_=' + Date.now());
+    if (res.ok) {
+      const favs = await res.json();
+      if (Array.isArray(favs)) {
+        return favs.map(f => ({ ...f, categoryId: 'favorites_folder_3', isExternalFav: true }));
+      }
+    }
+  } catch (e) { console.warn("favourit3.json not found."); }
   return [];
 }
 
@@ -347,19 +371,38 @@ async function exportFavoritesOnly() {
   showToast('✅ تم تصدير ملف favourit.json بنجاح');
 }
 
-async function exportFavorites2Only() {
-  const favs = shortcuts.filter(s => s.categoryId === 'favorites_folder_2');
-  if (favs.length === 0) {
-    showToast('⚠️ لا توجد مواقع في مجلد المفضلة 2 لتصديرها');
+async function exportFavoritesCombined() {
+  const favoriteFiles = [
+    { categoryId: 'favorites_folder', filename: 'favourit.json', displayName: 'المفضلة' },
+    { categoryId: 'favorites_folder_2', filename: 'favourit2.json', displayName: 'مفضلة 2' },
+    { categoryId: 'favorites_folder_3', filename: 'favourit3.json', displayName: 'مفضلة 3' }
+  ];
+
+  const zip = new JSZip();
+  const dbFolder = zip.folder('database_chunks');
+  let hasAnyFavorites = false;
+
+  favoriteFiles.forEach(item => {
+    const favs = shortcuts
+      .filter(s => s.categoryId === item.categoryId)
+      .map(({ isExternalFav, ...rest }) => rest);
+    if (favs.length > 0) hasAnyFavorites = true;
+    dbFolder.file(item.filename, JSON.stringify(favs, null, 2));
+  });
+
+  if (!hasAnyFavorites) {
+    showToast('⚠️ لا توجد مواقع في أي من مجلدات المفضلة للتصدير');
     return;
   }
-  const cleanFavs = favs.map(({ isExternalFav, ...rest }) => rest);
-  const blob = new Blob([JSON.stringify(cleanFavs, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
+
+  const content = await zip.generateAsync({ type: 'blob' });
+  const url = URL.createObjectURL(content);
   const a = document.createElement('a');
-  a.href = url; a.download = 'favourit2.json'; a.click();
+  a.href = url;
+  a.download = `favorites_export_${new Date().getTime()}.zip`;
+  a.click();
   URL.revokeObjectURL(url);
-  showToast('✅ تم تصدير ملف favourit2.json بنجاح');
+  showToast('✅ تم تصدير جميع المفضلات في ملف ZIP واحد');
 }
 
 async function initApp() {
@@ -373,6 +416,9 @@ async function initApp() {
     }
     if (!categories.some(c => c.id === 'favorites_folder_2')) {
       categories.push({ id: 'favorites_folder_2', name: 'مفضلة 2', isSystem: true });
+    }
+    if (!categories.some(c => c.id === 'favorites_folder_3')) {
+      categories.push({ id: 'favorites_folder_3', name: 'مفضلة 3', isSystem: true });
     }
 
     // 2. Fast initial load from browser storage or IndexedDB
@@ -390,13 +436,16 @@ async function initApp() {
 
     const dbHasFavs1 = shortcuts.some(s => s.categoryId === 'favorites_folder');
     const dbHasFavs2 = shortcuts.some(s => s.categoryId === 'favorites_folder_2');
+    const dbHasFavs3 = shortcuts.some(s => s.categoryId === 'favorites_folder_3');
 
     const externalFavs1 = dbHasFavs1 ? [] : await loadFavoritesFromFile();
     const externalFavs2 = dbHasFavs2 ? [] : await loadFavorites2FromFile();
+    const externalFavs3 = dbHasFavs3 ? [] : await loadFavorites3FromFile();
 
     if (!dbHasFavs1) shortcuts = shortcuts.filter(s => s.categoryId !== 'favorites_folder');
     if (!dbHasFavs2) shortcuts = shortcuts.filter(s => s.categoryId !== 'favorites_folder_2');
-    shortcuts = [...shortcuts, ...externalFavs1, ...externalFavs2];
+    if (!dbHasFavs3) shortcuts = shortcuts.filter(s => s.categoryId !== 'favorites_folder_3');
+    shortcuts = [...shortcuts, ...externalFavs1, ...externalFavs2, ...externalFavs3];
 
     // 3. Load an initial bundle file if no local snapshot is available
     if (shortcuts.length === 0) {
@@ -410,8 +459,8 @@ async function initApp() {
         }
 
         const chunkFavs = await loadFavoritesFromChunks();
-        shortcuts = shortcuts.filter(s => s.categoryId !== 'favorites_folder' && s.categoryId !== 'favorites_folder_2');
-        shortcuts = [...shortcuts, ...chunkFavs.favs1, ...chunkFavs.favs2];
+        shortcuts = shortcuts.filter(s => s.categoryId !== 'favorites_folder' && s.categoryId !== 'favorites_folder_2' && s.categoryId !== 'favorites_folder_3');
+        shortcuts = [...shortcuts, ...chunkFavs.favs1, ...chunkFavs.favs2, ...chunkFavs.favs3];
       }
     }
 
@@ -769,9 +818,13 @@ async function exportData() {
     const favourites2Payload = currentShortcuts
       .filter(s => s.categoryId === 'favorites_folder_2')
       .map(({ isExternalFav, ...rest }) => rest);
+    const favourites3Payload = currentShortcuts
+      .filter(s => s.categoryId === 'favorites_folder_3')
+      .map(({ isExternalFav, ...rest }) => rest);
 
     dbFolder.file('favourit.json', JSON.stringify(favouritesPayload, null, 2));
     dbFolder.file('favourit2.json', JSON.stringify(favourites2Payload, null, 2));
+    dbFolder.file('favourit3.json', JSON.stringify(favourites3Payload, null, 2));
 
     chunks.forEach((chunk, index) => {
       dbFolder.file(`data${index + 1}.json`, chunk);
@@ -936,9 +989,10 @@ function renderIcons() {
 
     // Apply border color (default white if not set, skip if transparent)
     if (s.borderColor !== 'transparent') {
+      const isOrange = s.borderColor === '#ffa500';
       card.style.borderColor = s.borderColor || '#ffffff';
-      card.style.borderWidth = '3px';
-      card.style.borderStyle = 'solid';
+      card.style.borderWidth = isOrange ? '5px' : '3px';
+      card.style.borderStyle = isOrange ? 'double' : 'solid';
     }
 
     card.innerHTML = buildIconImg(s, 42) + `<span class="icon-name">${escHtml(s.name)}</span>`;
@@ -954,7 +1008,7 @@ function renderWelcomeGrid() {
   const grid = document.getElementById('welcomeIconsGrid');
   grid.innerHTML = '';
 
-  const isFavView = _currentCategory === 'favorites_folder' || _currentCategory === 'favorites_folder_2';
+  const isFavView = ['favorites_folder', 'favorites_folder_2', 'favorites_folder_3'].includes(_currentCategory);
   const isCategoryView = _currentCategory !== 'all' && !isFavView;
 
   // Switch grid layout for favorites and category views
@@ -971,14 +1025,15 @@ function renderWelcomeGrid() {
 
   if (_currentCategory === 'all') {
     // Show all categories as Folders first
-    categories.forEach(cat => {
+    categories.filter(cat => !cat.hidden).forEach(cat => {
       const item = document.createElement('div');
       item.className = 'welcome-icon-item folder-item';
       item.title = cat.name;
       
       let iconColor = '#4a4a6a';
-      if (cat.id === 'favorites_folder') iconColor = '#e50914';
+      if (cat.id === 'favorites_folder') iconColor = '#28a745';
       if (cat.id === 'favorites_folder_2') iconColor = '#ff6b6b';
+      if (cat.id === 'favorites_folder_3') iconColor = '#e50914';
 
       item.innerHTML = `
         <div class="icon-fallback folder-icon" style="width:52px;height:52px;border-radius:12px;background:${iconColor};font-size:24px;">📁</div>
@@ -1001,7 +1056,7 @@ function renderWelcomeGrid() {
       return (a.order || 0) - (b.order || 0); // Fallback to order
     });
     
-    const isFavView = _currentCategory === 'favorites_folder' || _currentCategory === 'favorites_folder_2';
+    const isFavView = ['favorites_folder', 'favorites_folder_2', 'favorites_folder_3'].includes(_currentCategory);
     const itemsPerPage = isFavView ? 20 : ITEMS_PER_PAGE; // Fewer items for favorites for better performance
     
     const totalItems = filtered.length;
@@ -1037,7 +1092,11 @@ function renderWelcomeGrid() {
         // Movie Card Style for Favorites with background image
         const accentColor = s.color || '#e50914';
         const bgImageStyle = s.bgImage ? `background-image:url('${s.bgImage}');` : '';
-        const borderColor = s.borderColor !== 'transparent' ? `border-color:${s.borderColor || '#ffffff'};border-width:3px;border-style:solid;` : '';
+        let borderColor = '';
+        if (s.borderColor !== 'transparent') {
+          const isOrange = s.borderColor === '#ffa500';
+          borderColor = `border-color:${s.borderColor || '#ffffff'};border-width:${isOrange ? '5px' : '3px'};border-style:${isOrange ? 'double' : 'solid'};`;
+        }
         item.innerHTML = `
           <div class="item-number">${globalIndex}</div>
           <div class="fav-rect-frame" style="--item-color:${accentColor};${bgImageStyle}${borderColor}">
@@ -1047,9 +1106,10 @@ function renderWelcomeGrid() {
         `;
       } else {
         if (s.borderColor !== 'transparent') {
+          const isOrange = s.borderColor === '#ffa500';
           item.style.borderColor = s.borderColor || '#ffffff';
-          item.style.borderWidth = '3px';
-          item.style.borderStyle = 'solid';
+          item.style.borderWidth = isOrange ? '5px' : '3px';
+          item.style.borderStyle = isOrange ? 'double' : 'solid';
         }
         item.innerHTML = `
           <div class="item-number">${globalIndex}</div>
@@ -1951,7 +2011,7 @@ function renderCategorySelector() {
   const menu = document.getElementById('categorySelectMenu');
   if (menu) {
     let html = `<button onclick="selectCategory('all')">📂 كل المواقع</button><hr class="dropdown-divider" />`;
-    categories.forEach(c => {
+    categories.filter(c => !c.hidden).forEach(c => {
       html += `<button onclick="selectCategory('${c.id}')">📁 ${escHtml(c.name)}</button>`;
     });
     menu.innerHTML = html;
@@ -1962,7 +2022,8 @@ function renderCategorySelector() {
   if (selectCombo) {
     let html = '';
     categories.forEach(c => {
-      html += `<option value="${c.id}">${escHtml(c.name)}</option>`;
+      const label = c.hidden ? `${escHtml(c.name)} (مخفي)` : escHtml(c.name);
+      html += `<option value="${c.id}">${label}</option>`;
     });
     selectCombo.innerHTML = html;
   }
@@ -2074,20 +2135,32 @@ function renderManageCategoriesList() {
   const list = document.getElementById('categoriesList');
   list.innerHTML = '';
   categories.forEach((c, index) => {
-    const isSystem = c.id === 'general' || c.id === 'favorites_folder';
+    const isSystem = c.id === 'general' || c.id === 'favorites_folder' || c.id === 'favorites_folder_2' || c.id === 'favorites_folder_3';
     const li = document.createElement('li');
     li.innerHTML = `
-      <span class="category-name-display">${escHtml(c.name)} ${isSystem ? '<small style="opacity:0.5">(أساسي)</small>' : ''}</span>
+      <span class="category-name-display">${escHtml(c.name)} ${c.hidden ? '<small style="opacity:0.5">(مخفي)</small>' : ''} ${isSystem ? '<small style="opacity:0.5">(أساسي)</small>' : ''}</span>
       <div class="cat-actions" style="display:flex;gap:4px;align-items:center;">
         <button class="cat-btn" onclick="moveCategory('${c.id}', -1)" title="لأعلى" style="font-size:10px; padding:2px 6px; ${index === 0 || isSystem ? 'opacity:0.3;cursor:not-allowed;' : ''}" ${index === 0 || isSystem ? 'disabled' : ''}>▲</button>
         <button class="cat-btn" onclick="moveCategory('${c.id}', 1)" title="لأسفل" style="font-size:10px; padding:2px 6px; ${index === categories.length - 1 || isSystem ? 'opacity:0.3;cursor:not-allowed;' : ''}" ${index === categories.length - 1 || isSystem ? 'disabled' : ''}>▼</button>
         <div style="width:1px;height:16px;background:var(--glass-border);margin:0 2px;"></div>
+        <button class="cat-btn" onclick="toggleCategoryVisibility('${c.id}')" title="${c.hidden ? 'إظهار المجلد' : 'إخفاء المجلد'}" style="font-size:10px; padding:2px 6px;">${c.hidden ? '👁️ إظهار' : '🙈 إخفاء'}</button>
         ${!isSystem ? `<button class="cat-btn" onclick="renameCategory('${c.id}')" title="تعديل الاسم">✏️</button>` : ''}
         ${!isSystem ? `<button class="cat-btn delete" onclick="deleteCategory('${c.id}')" title="حذف">🗑️</button>` : ''}
       </div>
     `;
     list.appendChild(li);
   });
+}
+
+function toggleCategoryVisibility(id) {
+  const cat = categories.find(c => c.id === id);
+  if (!cat) return;
+  cat.hidden = !cat.hidden;
+  saveShortcuts();
+  renderManageCategoriesList();
+  renderCategorySelector();
+  renderIcons();
+  renderWelcomeGrid();
 }
 
 function moveCategory(id, dir) {
@@ -2183,7 +2256,8 @@ function renderManageSitesList() {
 
   let catOptionsHTML = '';
   categories.forEach(c => {
-    catOptionsHTML += `<option value="${c.id}">${escHtml(c.name)}</option>`;
+    const label = c.hidden ? `${escHtml(c.name)} (مخفي)` : escHtml(c.name);
+    catOptionsHTML += `<option value="${c.id}">${label}</option>`;
   });
 
   shortcuts.forEach(s => {
