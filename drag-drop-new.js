@@ -15,6 +15,13 @@ function setupDragAndDrop() {
     welcomeGrid.addEventListener('drop', handleGridDrop);
     welcomeGrid.addEventListener('dragleave', handleGridDragLeave);
   }
+
+  // Setup drag and drop for items inside folders
+  setupDragAndDropForItems();
+}
+
+function setupDragAndDropForItems() {
+  // Drag and drop for items is handled in app.js
 }
 
 function handleDragOver(e) {
@@ -200,6 +207,9 @@ function addSiteToFolder(url, name, folderId) {
 
   showToast(`✅ تم إضافة "${name}" إلى المجلد`);
 }
+
+// ── Drag and Drop for Items Inside Folders ──────────────────────────────
+// Handled in app.js
 
 // Initialize drag and drop when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {

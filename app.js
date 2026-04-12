@@ -1649,6 +1649,42 @@ function ctxDelete() {
   closeContextMenu();
 }
 
+function ctxChangeOrder() {
+  if (!ctxTargetId) return;
+  const s = shortcuts.find(x => x.id === ctxTargetId);
+  if (!s) return;
+
+  // Get current order
+  const currentOrder = s.order || 0;
+
+  // Prompt for new order
+  const newOrder = prompt(`أدخل رقم الترتيب الجديد لـ "${s.name}" (الحالي: ${currentOrder}):`, currentOrder);
+  if (newOrder === null) return; // Cancelled
+
+  const orderNum = parseInt(newOrder);
+  if (isNaN(orderNum) || orderNum < 0) {
+    showToast('❌ رقم الترتيب غير صحيح');
+    return;
+  }
+
+  // Update order
+  s.order = orderNum;
+
+  // Re-sort shortcuts in the same category
+  const categoryShortcuts = shortcuts.filter(x => x.categoryId === s.categoryId);
+  categoryShortcuts.sort((a, b) => (a.order || 0) - (b.order || 0));
+
+  // Update orders to be sequential
+  categoryShortcuts.forEach((item, index) => {
+    item.order = index;
+  });
+
+  saveShortcuts();
+  renderWelcomeGrid();
+  showToast(`✅ تم تغيير ترتيب "${s.name}"`);
+  closeContextMenu();
+}
+
 function ctxBorderColor() {
   if (!ctxTargetId) return;
   const s = shortcuts.find(x => x.id === ctxTargetId);
@@ -2276,6 +2312,7 @@ function renderManageSitesList() {
         <span class="site-row-name" style="font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escHtml(s.name)}</span>
       </div>
       <div class="site-row-actions" style="flex-shrink:0;">
+        <button class="cat-btn edit" onclick="editSite('${s.id}')" title="تعديل" style="padding: 6px;">✏️</button>
         <button class="cat-btn delete" onclick="quickDeleteSite('${s.id}')" title="حذف" style="padding: 6px;">🗑️</button>
       </div>
     `;
@@ -2305,6 +2342,16 @@ function quickDeleteSite(siteId) {
       goHome();
     }
   }
+}
+
+function editSite(siteId) {
+  const s = shortcuts.find(x => x.id === siteId);
+  if (!s) return;
+
+  // Open the edit modal with the site data
+  openEditModal(s);
+  // Close the manage sites modal
+  closeManageSitesModal();
 }
 
 // إضافة event listeners لأزرار الألوان

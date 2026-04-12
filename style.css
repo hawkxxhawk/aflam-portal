@@ -111,10 +111,11 @@ html {
 
 /* ===== TITLE BAR ===== */
 #titleBar {
-  position: fixed;
-  top: var(--bar-h);
-  left: 0;
-  right: 0;
+  /* Remove fixed positioning to make it part of normal page flow */
+  /* position: fixed; */
+  /* top: var(--bar-h); */
+  /* left: 0; */
+  /* right: 0; */
   height: 60px;
   background: var(--bg);
   border-bottom: 1px solid var(--glass-border);
@@ -205,31 +206,36 @@ html {
   }
   
   #welcomeScreen {
-    min-height: calc(100vh - 75px - 45px);
-    margin-top: calc(75px + 45px);
+    /* Remove margin-top since bars are now part of flow */
+    /* min-height: calc(100vh - 75px - 45px); */
+    /* margin-top: calc(75px + 45px); */
   }
   
   #welcomeScreen.category-view,
   #welcomeScreen.home-view {
-    margin-top: calc(75px + 45px);
-    min-height: calc(100vh - 75px - 45px);
+    /* Remove margin-top since bars are now part of flow */
+    /* margin-top: calc(75px + 45px); */
+    /* min-height: calc(100vh - 75px - 45px); */
   }
   
   #welcomeIconsGrid {
-    max-height: calc(100vh - 75px - 45px);
+    /* Adjust max-height since bars are now part of flow */
+    /* max-height: calc(100vh - 75px - 45px); */
   }
   
   #welcomeScreen.category-view #welcomeIconsGrid {
-    max-height: calc(100vh - 75px - 45px);
+    /* Remove max-height since bars are now part of flow */
+    /* max-height: calc(100vh - 75px - 45px); */
   }
 }
 
 /* ===== TOP BAR ===== */
 #topBar {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
+  /* Remove fixed positioning to make it part of normal page flow */
+  /* position: fixed; */
+  /* top: 0; */
+  /* left: 0; */
+  /* right: 0; */
   min-height: 64px;
   display: flex;
   align-items: center;
@@ -239,7 +245,7 @@ html {
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border-bottom: 1px solid var(--glass-border);
-  z-index: 100;
+  /* z-index: 100; */
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
   transition: min-height var(--trans), padding var(--trans);
 }
@@ -315,7 +321,7 @@ html {
   min-width: 250px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
   animation: popIn 0.15s ease both;
-  z-index: 200;
+  z-index: 2000;
 }
 
 .dropdown-header {
@@ -415,8 +421,9 @@ html {
 #topBar,
 #topBar button,
 #topBar .ctrl-btn,
-.category-selector-wrapper {
-  touch-action: manipulation;
+.settings-wrapper {
+  position: relative;
+  z-index: 1500;
 }
 
 /* Icon Card */
@@ -490,8 +497,9 @@ html {
 /* Specific fix for welcomeScreen to allow scrolling */
 #welcomeScreen {
   position: relative; /* Change from fixed to relative to allow natural scrolling */
-  min-height: calc(100vh - var(--bar-h) - 60px); /* Subtract title bar height */
-  margin-top: calc(var(--bar-h) + 60px); /* Add title bar height */
+  /* Remove margin-top since bars are now part of flow */
+  /* min-height: calc(100vh - var(--bar-h) - 60px); */ /* Subtract title bar height */
+  /* margin-top: calc(var(--bar-h) + 60px); */ /* Add title bar height */
   display: flex;
   flex-direction: column;
   align-items: center; /* Center horizontally */
@@ -507,17 +515,19 @@ html {
 
 #welcomeScreen.category-view,
 #welcomeScreen.home-view {
-  margin-top: calc(var(--bar-h) + 60px);
-  min-height: calc(100vh - var(--bar-h) - 60px);
+  /* Remove margin-top since bars are now part of flow */
+  /* margin-top: calc(var(--bar-h) + 60px); */
+  /* min-height: calc(100vh - var(--bar-h) - 60px); */
 }
 
 .welcome-content {
   text-align: center;
   z-index: 2;
-  padding: 20px;
+  padding: 5px; /* Reduce from 10px */
   width: 100%;
   max-width: 1200px;
   animation: fadeUp 0.6s ease both;
+  flex: none; /* Don't grow, take only needed space */
 }
 
 @keyframes fadeUp {
@@ -533,8 +543,8 @@ html {
 }
 
 .welcome-logo {
-  font-size: 72px;
-  margin-bottom: 16px;
+  font-size: 36px; /* Reduce from 72px */
+  margin-bottom: 8px; /* Reduce from 16px */
   animation: pulse 3s ease-in-out infinite;
 }
 
@@ -551,29 +561,29 @@ html {
 }
 
 .welcome-content h1 {
-  font-size: 2.8rem;
+  font-size: 1.5rem; /* Reduce from 2.8rem */
   font-weight: 900;
   background: linear-gradient(135deg, #fff 30%, var(--accent));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  margin-bottom: 10px;
+  margin-bottom: 5px; /* Reduce from 10px */
 }
 
 .welcome-content p {
   color: var(--text-muted);
-  font-size: 1rem;
-  margin-bottom: 32px;
+  font-size: 0.9rem; /* Reduce from 1rem */
+  margin-bottom: 10px; /* Reduce from 32px */
 }
 
 #welcomeIconsGrid {
   display: flex;
-  flex: 1; /* Take remaining space */
+  flex: 1 1 auto; /* Take remaining space */
   flex-wrap: wrap; /* Restore wrapping for mobile to see all items */
   gap: 12px;
   justify-content: center;
   max-width: 100%;
-  padding: 10px;
+  padding: 5px; /* Reduce padding to minimize space */
   width: 100%;
   /* Performance optimizations */
   contain: layout style paint; /* CSS containment for better performance */
@@ -581,7 +591,7 @@ html {
 
 #welcomeScreen.category-view #welcomeIconsGrid,
 #welcomeScreen.home-view #welcomeIconsGrid {
-  padding: 20px 16px;
+  padding: 10px 16px; /* Reduce padding */
 }
 
 #welcomeScreen.category-view,
@@ -803,9 +813,10 @@ html {
 
 /* ===== IFRAME VIEWER ===== */
 #viewerWrapper {
-  position: fixed;
-  inset: 0;
-  top: var(--bar-h);
+  /* Remove fixed positioning to make it part of normal page flow */
+  /* position: fixed; */
+  /* inset: 0; */
+  /* top: var(--bar-h); */
   display: flex;
   flex-direction: column;
   background: #000;
@@ -1249,22 +1260,24 @@ input[type="color"] {
 }
 
 body.app-mode #topBarHoverArea {
-  display: block;
+  /* Hide hover area since bar is now part of flow */
+  display: none;
 }
 
 body.app-mode #topBar {
-  transform: translateY(-100%);
-  transition: transform 0.35s ease-in-out;
+  /* Remove transform and fixed positioning since bar is now part of flow */
+  /* transform: none; */
+  /* position: fixed; */
 }
 
 body.app-mode #topBarHoverArea:hover~#topBar,
 body.app-mode #topBar:hover {
-  transform: translateY(0);
+  /* Remove hover effects since bar is always visible */
 }
 
 body.app-mode #viewerWrapper {
-  top: 0 !important;
-  /* Full screen - overrides top: var(--bar-h) */
+  /* Remove top adjustment since bars are now part of flow */
+  /* top: var(--bar-h) !important; */
 }
 
 /* ===== ANDROID & MOBILE OPTIMIZATIONS (Enhanced) ===== */
@@ -1531,6 +1544,41 @@ body.app-mode #viewerWrapper {
   line-height: 1.4;
   word-wrap: break-word;
   overflow-wrap: break-word;
+}
+
+/* Manage Categories Modal Scroll */
+.categories-list-container {
+  max-height: 55vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+/* Site management buttons */
+.cat-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--glass-border);
+  border-radius: 6px;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.2s ease;
+}
+
+.cat-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.cat-btn.edit {
+  margin-right: 5px;
+}
+
+.cat-btn.delete {
+  background: rgba(229, 9, 20, 0.2);
+  border-color: #e50914;
+}
+
+.cat-btn.delete:hover {
+  background: rgba(229, 9, 20, 0.4);
 }
 
 @media screen and (max-width: 768px) {
