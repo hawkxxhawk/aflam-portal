@@ -1,0 +1,120 @@
+[
+  {
+    "id": "youtube",
+    "name": "YouTube",
+    "url": "https://www.youtube.com/results?search_query=%D9%81%D9%8A%D9%84%D9%85&sp=EgIQAg%253D%253D",
+    "color": "#ff0000",
+    "image": null,
+    "emoji": "Y",
+    "categoryId": "general",
+    "openMode": "browser",
+    "order": 10
+  },
+  {
+    "id": "egydead",
+    "name": "ايجي ديد",
+    "url": "https://egydead.live",
+    "color": "#1db954",
+    "image": null,
+    "emoji": "ا",
+    "categoryId": "general",
+    "order": 0
+  },
+  {
+    "id": "site_1774986970817",
+    "name": "فيديو فيولا",
+    "url": "https://vio-la.com/category.php?cat=aflammotrjma",
+    "color": "#1a1a2e",
+    "image": null,
+    "emoji": "ف",
+    "categoryId": "general",
+    "order": 1
+  },
+  {
+    "id": "site_1774987372043",
+    "name": "5ivtv",
+    "url": "https://rt21749po.5ivtv.in/category/18-rows/",
+    "color": "#1a1a2e",
+    "image": null,
+    "emoji": "5",
+    "categoryId": "general",
+    "order": 2
+  },
+  {
+    "id": "site_1774988232634",
+    "name": "aflam.top",
+    "url": "https://aflam.top/tag/%D9%84%D9%84%D9%83%D8%A8%D8%A7%D8%B1-%D9%81%D9%82%D8%B7/",
+    "color": "#1a1a2e",
+    "image": null,
+    "emoji": "A",
+    "openMode": "browser",
+    "categoryId": "general",
+    "order": 3
+  },
+  {
+    "id": "site_1775423956784",
+    "name": "M.qfilm.tv",
+    "url": "https://m.qfilm.tv/",
+    "color": "#e2039c",
+    "categoryId": "general",
+    "image": null,
+    "bgImage": null,
+    "emoji": "M",
+    "order": 4
+  },
+  {
+    "id": "site_1775424103901",
+    "name": "Iegybest.club",
+    "url": "https://iegybest.club/",
+    "color": "#67171b",
+    "categoryId": "general",
+    "image": null,
+    "bgImage": null,
+    "emoji": "I",
+    "order": 5
+  },
+  {
+    "id": "site_1775424123178",
+    "name": "Cimafree.onl",
+    "url": "https://cimafree.onl/",
+    "color": "#643e58",
+    "categoryId": "general",
+    "image": null,
+    "bgImage": null,
+    "emoji": "C",
+    "order": 6
+  },
+  {
+    "id": "site_1775424422824",
+    "name": "Aflam.top",
+    "url": "https://aflam.top/",
+    "color": "#28cb2f",
+    "categoryId": "general",
+    "image": null,
+    "bgImage": null,
+    "emoji": "A",
+    "order": 7
+  },
+  {
+    "id": "site_1775424648530",
+    "name": "Egydead.ca",
+    "url": "https://egydead.ca/",
+    "color": "#91e441",
+    "categoryId": "general",
+    "image": null,
+    "bgImage": null,
+    "emoji": "E",
+    "order": 8
+  },
+  {
+    "id": "site_1775425007462",
+    "name": "Moviz-time.co",
+    "url": "https://moviz-time.co/main/",
+    "color": "#d0ca4e",
+    "categoryId": "general",
+    "image": null,
+    "bgImage": null,
+    "emoji": "M",
+    "order": 9
+  }
+]

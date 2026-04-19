@@ -1,0 +1,36 @@
+[
+  {
+    "id": "site_1774993008362",
+    "name": "filmleek.com",
+    "url": "https://filmleek.com/genre/%D8%A7%D9%81%D9%84%D8%A7%D9%85-%D9%84%D9%84%D9%83%D8%A8%D8%A7%D8%B1",
+    "color": "#0fea0b",
+    "categoryId": "++ RATED",
+    "image": null,
+    "emoji": "F",
+    "openMode": "iframe",
+    "bgImage": null,
+    "order": 0
+  },
+  {
+    "id": "site_1774993506656",
+    "name": "sexaflam.com",
+    "url": "https://sexaflam.com/movies/",
+    "color": "#1a1a2e",
+    "categoryId": "++ RATED",
+    "image": null,
+    "emoji": "S",
+    "bgImage": null,
+    "order": 1
+  },
+  {
+    "id": "site_1776628144681",
+    "name": "Xxxshame.com",
+    "url": "https://xxxshame.com/ar/categories",
+    "color": "#974bfe",
+    "categoryId": "++ RATED",
+    "image": null,
+    "bgImage": null,
+    "emoji": "X",
+    "order": 2
+  }
+]

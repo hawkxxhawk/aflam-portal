@@ -1,0 +1,68 @@
+[
+  {
+    "id": "site_1775424021140",
+    "name": "M.qfilm.tv",
+    "url": "https://m.qfilm.tv/category.php?cat=egyptian-movies",
+    "color": "#1a0cb0",
+    "categoryId": "ARABIC MOVIES",
+    "image": null,
+    "bgImage": null,
+    "emoji": "M",
+    "order": 0
+  },
+  {
+    "id": "site_1775424189665",
+    "name": "Ak.sv",
+    "url": "https://ak.sv/movies?section=29&category=0&rating=0&year=0&language=0&formats=0&quality=0",
+    "color": "#810564",
+    "categoryId": "ARABIC MOVIES",
+    "image": null,
+    "bgImage": null,
+    "emoji": "A",
+    "order": 1
+  },
+  {
+    "id": "site_1775424461539",
+    "name": "Aflam.top",
+    "url": "https://aflam.top/category/%d8%a7%d9%81%d9%84%d8%a7%d9%85/%d8%a7%d9%81%d9%84%d8%a7%d9%85-%d8%b9%d8%b1%d8%a8%d9%8a%d8%a9/",
+    "color": "#d56c1f",
+    "categoryId": "ARABIC MOVIES",
+    "image": null,
+    "bgImage": null,
+    "emoji": "A",
+    "order": 2
+  },
+  {
+    "id": "site_1775424555513",
+    "name": "Mycima.loan",
+    "url": "https://mycima.loan/category/%d8%a7%d9%81%d9%84%d8%a7%d9%85-%d8%b9%d8%b1%d8%a8%d9%8a/",
+    "color": "#60eb16",
+    "categoryId": "ARABIC MOVIES",
+    "image": null,
+    "bgImage": null,
+    "emoji": "M",
+    "order": 3
+  },
+  {
+    "id": "site_1775424603613",
+    "name": "Cimafree.onl",
+    "url": "https://cimafree.onl/category.php?cat=arabic-moives",
+    "color": "#570e3d",
+    "categoryId": "ARABIC MOVIES",
+    "image": null,
+    "bgImage": null,
+    "emoji": "C",
+    "order": 4
+  },
+  {
+    "id": "site_1775424936957",
+    "name": "Asd.pics",
+    "url": "https://asd.pics/category/arabic-movies-12/",
+    "color": "#43ded",
+    "categoryId": "ARABIC MOVIES",
+    "image": null,
+    "bgImage": null,
+    "emoji": "A",
+    "order": 5
+  }
+]
