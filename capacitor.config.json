@@ -1,0 +1,9 @@
+{
+  "appId": "org.rmovies.app",
+  "appName": "R-Movies",
+  "webDir": "www",
+  "bundledWebRuntime": false,
+  "server": {
+    "cleartext": true
+  }
+}
