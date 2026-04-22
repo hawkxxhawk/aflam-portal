@@ -8,7 +8,7 @@
     "image": null,
     "emoji": "ا",
     "bgImage": null,
-    "order": 0
+    "order": 1
   },
   {
     "id": "site_1774992578979",
@@ -20,7 +20,7 @@
     "emoji": "س",
     "openMode": "browser",
     "bgImage": null,
-    "order": 1
+    "order": 2
   },
   {
     "id": "site_1774992951706",
@@ -32,7 +32,7 @@
     "emoji": "ا",
     "openMode": "browser",
     "bgImage": null,
-    "order": 2
+    "order": 3
   },
   {
     "id": "site_1774993175517",
@@ -43,7 +43,7 @@
     "image": null,
     "emoji": "ا",
     "bgImage": null,
-    "order": 3
+    "order": 4
   },
   {
     "id": "site_1774993232796",
@@ -54,7 +54,7 @@
     "image": null,
     "emoji": "A",
     "bgImage": null,
-    "order": 4
+    "order": 5
   },
   {
     "id": "site_1774993349593",
@@ -65,7 +65,7 @@
     "image": null,
     "emoji": "B",
     "bgImage": null,
-    "order": 5
+    "order": 6
   },
   {
     "id": "site_1775423616546",
@@ -76,7 +76,7 @@
     "image": null,
     "bgImage": null,
     "emoji": "E",
-    "order": 6
+    "order": 7
   },
   {
     "id": "site_1775423998575",
@@ -87,7 +87,7 @@
     "image": null,
     "bgImage": null,
     "emoji": "M",
-    "order": 7
+    "order": 8
   },
   {
     "id": "site_1775424049394",
@@ -98,7 +98,7 @@
     "image": null,
     "bgImage": null,
     "emoji": "M",
-    "order": 8
+    "order": 9
   },
   {
     "id": "site_1775424140894",
@@ -109,7 +109,7 @@
     "image": null,
     "bgImage": null,
     "emoji": "F",
-    "order": 9
+    "order": 10
   },
   {
     "id": "site_1775424209099",
@@ -120,7 +120,7 @@
     "image": null,
     "bgImage": null,
     "emoji": "A",
-    "order": 10
+    "order": 11
   },
   {
     "id": "site_1775424285314",
@@ -131,7 +131,7 @@
     "image": null,
     "bgImage": null,
     "emoji": "H",
-    "order": 11
+    "order": 12
   },
   {
     "id": "site_1775424300883",
@@ -142,7 +142,7 @@
     "image": null,
     "bgImage": null,
     "emoji": "C",
-    "order": 12
+    "order": 13
   },
   {
     "id": "site_1775424445875",
@@ -153,7 +153,7 @@
     "image": null,
     "bgImage": null,
     "emoji": "A",
-    "order": 13
+    "order": 14
   },
   {
     "id": "site_1775424527987",
@@ -164,7 +164,7 @@
     "image": null,
     "bgImage": null,
     "emoji": "M",
-    "order": 14
+    "order": 15
   },
   {
     "id": "site_1775424622678",
@@ -175,7 +175,7 @@
     "image": null,
     "bgImage": null,
     "emoji": "C",
-    "order": 15
+    "order": 16
   },
   {
     "id": "site_1775424687682",
@@ -186,7 +186,7 @@
     "image": null,
     "bgImage": null,
     "emoji": "T",
-    "order": 16
+    "order": 17
   },
   {
     "id": "site_1775424752689",
@@ -197,7 +197,7 @@
     "image": null,
     "bgImage": null,
     "emoji": "M",
-    "order": 17
+    "order": 18
   },
   {
     "id": "site_1775424836944",
@@ -208,7 +208,7 @@
     "image": null,
     "bgImage": null,
     "emoji": "A",
-    "order": 18
+    "order": 19
   },
   {
     "id": "site_1775424872285",
@@ -219,7 +219,7 @@
     "image": null,
     "bgImage": null,
     "emoji": "T",
-    "order": 19
+    "order": 20
   },
   {
     "id": "site_1775424880141",
@@ -230,7 +230,7 @@
     "image": null,
     "bgImage": null,
     "emoji": "T",
-    "order": 20
+    "order": 21
   },
   {
     "id": "site_1775424907540",
@@ -241,7 +241,7 @@
     "image": null,
     "bgImage": null,
     "emoji": "A",
-    "order": 21
+    "order": 22
   },
   {
     "id": "site_1775473857151",
@@ -252,7 +252,7 @@
     "image": null,
     "bgImage": null,
     "emoji": "F",
-    "order": 22
+    "order": 23
   },
   {
     "id": "site_1775473990569",
@@ -263,7 +263,7 @@
     "image": null,
     "bgImage": null,
     "emoji": "E",
-    "order": 23
+    "order": 24
   },
   {
     "id": "site_1775502753093",
@@ -274,7 +274,7 @@
     "image": null,
     "bgImage": null,
     "emoji": "A",
-    "order": 24
+    "order": 25
   },
   {
     "id": "site_1775502870295",
@@ -285,7 +285,7 @@
     "image": null,
     "bgImage": null,
     "emoji": "A",
-    "order": 25
+    "order": 26
   },
   {
     "id": "site_1775502885639",
@@ -296,6 +296,29 @@
     "image": null,
     "bgImage": null,
     "emoji": "A",
-    "order": 26
+    "order": 27
+  },
+  {
+    "id": "site_1776885068229",
+    "name": "Egbest.net افلام-هندي/",
+    "url": "https://egbest.net/category/%d8%a7%d9%81%d9%84%d8%a7%d9%85-%d9%87%d9%86%d8%af%d9%8a/",
+    "color": "#60c4c1",
+    "categoryId": "E MOVIES",
+    "image": null,
+    "bgImage": null,
+    "emoji": "E",
+    "order": 28
+  },
+  {
+    "id": "site_1776885272462",
+    "name": "Egbest.net افلام اجنبيه",
+    "url": "https://egbest.net/category/%d8%a7%d9%81%d9%84%d8%a7%d9%85-%d8%a7%d8%ac%d9%86%d8%a8%d9%8a/",
+    "color": "#246b97",
+    "categoryId": "E MOVIES",
+    "image": null,
+    "bgImage": null,
+    "emoji": "E",
+    "order": 0,
+    "isFavorited": true
   }
 ]

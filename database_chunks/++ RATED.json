@@ -32,5 +32,27 @@
     "bgImage": null,
     "emoji": "X",
     "order": 2
+  },
+  {
+    "id": "site_1776720276119",
+    "name": "Sexmotarjam.com",
+    "url": "https://sexmotarjam.com/",
+    "color": "#65a248",
+    "categoryId": "++ RATED",
+    "image": null,
+    "bgImage": null,
+    "emoji": "S",
+    "order": 3
+  },
+  {
+    "id": "site_1776720306659",
+    "name": "Sexmotarjam.com",
+    "url": "https://sexmotarjam.com/category/%d9%85%d8%aa%d8%b1%d8%ac%d9%85/%d8%a7%d8%ba%d8%aa%d8%b5%d8%a7%d8%a8/",
+    "color": "#e44097",
+    "categoryId": "++ RATED",
+    "image": null,
+    "bgImage": null,
+    "emoji": "S",
+    "order": 4
   }
 ]

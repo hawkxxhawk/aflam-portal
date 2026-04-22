@@ -9,5 +9,16 @@
     "bgImage": null,
     "emoji": "C",
     "order": 0
+  },
+  {
+    "id": "site_1776885014465",
+    "name": "Egbest.net",
+    "url": "https://egbest.net/category/%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8%aa-%d8%b9%d8%b1%d8%a8%d9%8a/",
+    "color": "#459c6d",
+    "categoryId": "series",
+    "image": null,
+    "bgImage": null,
+    "emoji": "E",
+    "order": 1
   }
 ]

@@ -64,5 +64,16 @@
     "bgImage": null,
     "emoji": "A",
     "order": 5
+  },
+  {
+    "id": "site_1776885112363",
+    "name": "Egbest.net افلام عربى",
+    "url": "https://egbest.net/category/%d8%a7%d9%81%d9%84%d8%a7%d9%85-%d8%b9%d8%b1%d8%a8%d9%8a/",
+    "color": "#46de22",
+    "categoryId": "ARABIC MOVIES",
+    "image": null,
+    "bgImage": null,
+    "emoji": "E",
+    "order": 6
   }
 ]

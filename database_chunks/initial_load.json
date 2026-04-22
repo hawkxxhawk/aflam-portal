@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "exported": "2026-04-19T20:50:03.859Z",
+  "exported": "2026-04-22T20:47:35.867Z",
   "shortcuts": [
     {
       "id": "youtube",
@@ -63,7 +63,7 @@
       "image": null,
       "emoji": "ا",
       "bgImage": null,
-      "order": 0
+      "order": 1
     },
     {
       "id": "site_1774992578979",
@@ -75,7 +75,7 @@
       "emoji": "س",
       "openMode": "browser",
       "bgImage": null,
-      "order": 1
+      "order": 2
     },
     {
       "id": "site_1774992951706",
@@ -87,7 +87,7 @@
       "emoji": "ا",
       "openMode": "browser",
       "bgImage": null,
-      "order": 2
+      "order": 3
     },
     {
       "id": "site_1774993008362",
@@ -110,7 +110,7 @@
       "image": null,
       "emoji": "ا",
       "bgImage": null,
-      "order": 3
+      "order": 4
     },
     {
       "id": "site_1774993232796",
@@ -121,7 +121,7 @@
       "image": null,
       "emoji": "A",
       "bgImage": null,
-      "order": 4
+      "order": 5
     },
     {
       "id": "site_1774993349593",
@@ -132,7 +132,7 @@
       "image": null,
       "emoji": "B",
       "bgImage": null,
-      "order": 5
+      "order": 6
     },
     {
       "id": "site_1774993506656",
@@ -351,7 +351,7 @@
       "emoji": "ف",
       "isExternalFav": true,
       "borderColor": "#ff0000",
-      "order": 1
+      "order": 2
     },
     {
       "id": "site_1775416750605",
@@ -377,7 +377,7 @@
       "emoji": "A",
       "isExternalFav": true,
       "borderColor": "#ff0000",
-      "order": 2
+      "order": 3
     },
     {
       "id": "site_1775423449205",
@@ -399,7 +399,7 @@
       "image": null,
       "bgImage": null,
       "emoji": "E",
-      "order": 6
+      "order": 7
     },
     {
       "id": "site_1775423956784",
@@ -421,7 +421,7 @@
       "image": null,
       "bgImage": null,
       "emoji": "M",
-      "order": 7
+      "order": 8
     },
     {
       "id": "site_1775424021140",
@@ -443,7 +443,7 @@
       "image": null,
       "bgImage": null,
       "emoji": "M",
-      "order": 8
+      "order": 9
     },
     {
       "id": "site_1775424103901",
@@ -476,7 +476,7 @@
       "image": null,
       "bgImage": null,
       "emoji": "F",
-      "order": 9
+      "order": 10
     },
     {
       "id": "site_1775424189665",
@@ -498,7 +498,7 @@
       "image": null,
       "bgImage": null,
       "emoji": "A",
-      "order": 10
+      "order": 11
     },
     {
       "id": "site_1775424285314",
@@ -509,7 +509,7 @@
       "image": null,
       "bgImage": null,
       "emoji": "H",
-      "order": 11
+      "order": 12
     },
     {
       "id": "site_1775424300883",
@@ -520,7 +520,7 @@
       "image": null,
       "bgImage": null,
       "emoji": "C",
-      "order": 12
+      "order": 13
     },
     {
       "id": "site_1775424422824",
@@ -542,7 +542,7 @@
       "image": null,
       "bgImage": null,
       "emoji": "A",
-      "order": 13
+      "order": 14
     },
     {
       "id": "site_1775424461539",
@@ -564,7 +564,7 @@
       "image": null,
       "bgImage": null,
       "emoji": "M",
-      "order": 14
+      "order": 15
     },
     {
       "id": "site_1775424555513",
