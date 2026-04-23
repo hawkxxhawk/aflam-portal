@@ -682,6 +682,23 @@ function addSiteToFolder(url, name, folderId) {
   const id = 'site_' + Date.now();
   const color = '#' + Math.floor(Math.random() * 16777215).toString(16);
 
+  // ── Determine position based on current sort direction ──
+  // 'newest' → appear LAST  (highest order value)
+  // 'oldest' → appear FIRST (lowest order value, shift others down)
+  const catItems = shortcuts
+    .filter(s => s.categoryId === folderId)
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+  let newOrder;
+  if (_sortOrder === 'oldest') {
+    // Insert at the beginning: bump all existing items' order by 1
+    catItems.forEach(item => { item.order = (item.order ?? 0) + 1; });
+    newOrder = 0;
+  } else {
+    // Insert at the end: one step after the last item
+    newOrder = catItems.length > 0 ? (catItems[catItems.length - 1].order ?? 0) + 1 : 0;
+  }
+
   const newSite = {
     id,
     name,
@@ -690,7 +707,8 @@ function addSiteToFolder(url, name, folderId) {
     categoryId: folderId,
     image: null,
     bgImage: null,
-    emoji: name.charAt(0).toUpperCase()
+    emoji: name.charAt(0).toUpperCase(),
+    order: newOrder
   };
 
   shortcuts.push(newSite);
@@ -698,7 +716,8 @@ function addSiteToFolder(url, name, folderId) {
   renderIcons();
   renderWelcomeGrid();
 
-  showToast(`✅ تم إضافة "${name}" إلى المجلد`);
+  const pos = _sortOrder === 'oldest' ? 'أول' : 'آخر';
+  showToast(`✅ تمت إضافة "${name}" في ${pos} المجلد`);
 }
 
 window.addEventListener('load', () => {
@@ -1309,14 +1328,15 @@ function renderWelcomeGrid() {
     // Inside a specific category
     let filtered = shortcuts.filter(s => s.categoryId === _currentCategory);
 
-    // Sort by date added (newest or oldest first), then by order if dates are equal
+    // Sort: explicit order first (set by drag-drop or manual reorder), then by date as tiebreaker
     filtered.sort((a, b) => {
+      const aOrd = a.order ?? 0;
+      const bOrd = b.order ?? 0;
+      if (aOrd !== bOrd) return aOrd - bOrd;
+      // Same order value → fall back to date
       const aTime = parseInt(a.id.split('_')[1]) || 0;
       const bTime = parseInt(b.id.split('_')[1]) || 0;
-      if (aTime !== bTime) {
-        return _sortOrder === 'newest' ? bTime - aTime : aTime - bTime; // Newest or oldest first
-      }
-      return (a.order || 0) - (b.order || 0); // Fallback to order
+      return _sortOrder === 'newest' ? bTime - aTime : aTime - bTime;
     });
 
     const isFavView = ['favorites_folder', 'favorites_folder_2', 'favorites_folder_3'].includes(_currentCategory);
@@ -1368,6 +1388,7 @@ function renderWelcomeGrid() {
         }
         item.innerHTML = `
           <div class="item-number">${globalIndex}</div>
+          ${s.isFavorited ? '<div class="item-heart">❤️</div>' : ''}
           <div class="fav-rect-frame" style="--item-color:${accentColor};${bgImageStyle}${borderColor}">
             <div class="fav-rect-overlay"></div>
             <span class="fav-rect-name">${escHtml(s.name)}</span>
@@ -1377,6 +1398,7 @@ function renderWelcomeGrid() {
         // App shortcut style for Site locations
         item.innerHTML = `
           <div class="item-number">${globalIndex}</div>
+          ${s.isFavorited ? '<div class="item-heart">❤️</div>' : ''}
           ${buildIconImg(s, 72)}
           <span>${escHtml(s.name)}</span>
         `;
@@ -1818,31 +1840,64 @@ function goHome() {
 function toggleSortOrder() {
   _sortOrder = _sortOrder === 'newest' ? 'oldest' : 'newest';
   localStorage.setItem('rm_sort_order', _sortOrder);
+
+  // Rebuild `order` values based on the chosen date direction for all items
+  // in the current folder — this makes the visual grid update immediately
+  // and keeps manual reordering (ctxChangeOrder) working on top of it.
+  if (_currentCategory && _currentCategory !== 'all') {
+    const catItems = shortcuts
+      .filter(s => s.categoryId === _currentCategory)
+      .sort((a, b) => {
+        const aTime = parseInt(a.id.split('_')[1]) || 0;
+        const bTime = parseInt(b.id.split('_')[1]) || 0;
+        return _sortOrder === 'newest' ? bTime - aTime : aTime - bTime;
+      });
+    catItems.forEach((item, index) => { item.order = index; });
+    saveShortcuts();
+  }
+
+  _currentPage = 1;
   updateSortOrderButton();
   renderWelcomeGrid();
-  showToast(`✅ تم تغيير الترتيب إلى: ${_sortOrder === 'newest' ? 'الأحدث أولاً' : 'الأقدم أولاً'}`);
+  showToast(_sortOrder === 'newest' ? '⬆️ الأحدث أولاً' : '⬇️ الأقدم أولاً');
 }
 
-// ── Update sort order button ──────────────────────────────────────────
+// ── Update sort order button & folder bar ────────────────────────────
 function updateSortOrderButton() {
-  const label = document.getElementById('sortOrderLabel');
-  const icon = document.getElementById('sortOrderIcon');
-  const btn = document.getElementById('sortOrderBtn');
+  const label    = document.getElementById('sortOrderLabel');
+  const icon     = document.getElementById('sortOrderIcon');
+  const btn      = document.getElementById('sortOrderBtn');
+  const folderBar= document.getElementById('folderBar');
+  const barTitle = document.getElementById('folderBarTitle');
+  const barCount = document.getElementById('folderBarCount');
 
-  if (label) {
-    label.textContent = _sortOrder === 'newest' ? 'الأحدث' : 'الأقدم';
+  const inFolder = _currentCategory && _currentCategory !== 'all';
+
+  // Show / hide the whole folder bar
+  if (folderBar) folderBar.classList.toggle('hidden', !inFolder);
+
+  // Update folder name and item count
+  if (inFolder) {
+    if (barTitle) {
+      const cat = categories.find(c => c.id === _currentCategory);
+      barTitle.textContent = cat ? cat.name : _currentCategory;
+    }
+    if (barCount) {
+      const count = shortcuts.filter(s => s.categoryId === _currentCategory).length;
+      barCount.textContent = `${count} عنصر`;
+    }
   }
 
+  // Update sort button label/icon/tooltip
+  if (label) label.textContent = _sortOrder === 'newest' ? 'الأحدث' : 'الأقدم';
   if (icon) {
-    // Rotate icon based on sort order with smooth transition
-    icon.style.transition = 'transform 0.3s ease';
-    icon.style.transform = _sortOrder === 'newest' ? 'rotate(0deg)' : 'rotate(180deg)';
+    icon.style.transition = 'transform 0.35s ease';
+    icon.style.transform  = _sortOrder === 'newest' ? 'rotate(0deg)' : 'rotate(180deg)';
   }
-
   if (btn) {
-    btn.title = `ترتيب العناصر: ${_sortOrder === 'newest' ? 'الأحدث أولاً' : 'الأقدم أولاً'}`;
-    // Show button only when in a category/folder view
-    btn.style.display = _currentCategory !== 'all' ? 'flex' : 'none';
+    btn.title = _sortOrder === 'newest'
+      ? 'مرتب بالأحدث — اضغط للترتيب بالأقدم'
+      : 'مرتب بالأقدم — اضغط للترتيب بالأحدث';
   }
 }
 
@@ -1875,11 +1930,19 @@ function openContextMenu(e, id) {
   e.preventDefault();
   e.stopPropagation();
   ctxTargetId = id;
+
+  // Update heart button label to reflect current favorite state
+  const s = shortcuts.find(x => x.id === id);
+  const heartBtn = document.getElementById('ctxFavoriteBtn');
+  if (heartBtn && s) {
+    heartBtn.textContent = s.isFavorited ? '💔 إلغاء التفضيل' : '❤️ تفضيل';
+  }
+
   const menu = document.getElementById('contextMenu');
   menu.classList.remove('hidden');
   // Position near cursor, keep within viewport
   let x = e.clientX, y = e.clientY;
-  const mw = 160, mh = 120;
+  const mw = 175, mh = 200;
   if (x + mw > window.innerWidth) x = window.innerWidth - mw - 10;
   if (y + mh > window.innerHeight) y = window.innerHeight - mh - 10;
   menu.style.left = x + 'px';
@@ -1917,34 +1980,58 @@ function ctxChangeOrder() {
   const s = shortcuts.find(x => x.id === ctxTargetId);
   if (!s) return;
 
-  // Get current order
-  const currentOrder = s.order || 0;
+  // Build the current visible sorted list for this category
+  // (same sort logic as renderWelcomeGrid so positions match what user sees)
+  const catItems = shortcuts
+    .filter(x => x.categoryId === s.categoryId)
+    .sort((a, b) => {
+      const aOrd = a.order ?? 0;
+      const bOrd = b.order ?? 0;
+      if (aOrd !== bOrd) return aOrd - bOrd;
+      const aTime = parseInt(a.id.split('_')[1]) || 0;
+      const bTime = parseInt(b.id.split('_')[1]) || 0;
+      return _sortOrder === 'newest' ? bTime - aTime : aTime - bTime;
+    });
 
-  // Prompt for new order
-  const newOrder = prompt(`أدخل رقم الترتيب الجديد لـ "${s.name}" (الحالي: ${currentOrder}):`, currentOrder);
-  if (newOrder === null) return; // Cancelled
+  const total = catItems.length;
+  const currentPos = catItems.findIndex(x => x.id === ctxTargetId) + 1; // 1-indexed
 
-  const orderNum = parseInt(newOrder);
-  if (isNaN(orderNum) || orderNum < 0) {
-    showToast('❌ رقم الترتيب غير صحيح');
+  const input = prompt(
+    `موقع "${s.name}" الحالي: ${currentPos} من ${total}\nأدخل رقم الموقع الجديد (1 - ${total}):`,
+    currentPos
+  );
+  if (input === null) { closeContextMenu(); return; }
+
+  const newPos = parseInt(input);
+  if (isNaN(newPos) || newPos < 1 || newPos > total) {
+    showToast(`❌ أدخل رقماً بين 1 و ${total}`);
+    closeContextMenu();
     return;
   }
+  if (newPos === currentPos) { closeContextMenu(); return; }
 
-  // Update order
-  s.order = orderNum;
+  // Physically move: remove from current position, insert at new position (both 0-indexed)
+  catItems.splice(currentPos - 1, 1);
+  catItems.splice(newPos - 1, 0, s);
 
-  // Re-sort shortcuts in the same category
-  const categoryShortcuts = shortcuts.filter(x => x.categoryId === s.categoryId);
-  categoryShortcuts.sort((a, b) => (a.order || 0) - (b.order || 0));
-
-  // Update orders to be sequential
-  categoryShortcuts.forEach((item, index) => {
-    item.order = index;
-  });
+  // Reassign sequential order values so the new positions stick
+  catItems.forEach((item, index) => { item.order = index; });
 
   saveShortcuts();
   renderWelcomeGrid();
-  showToast(`✅ تم تغيير ترتيب "${s.name}"`);
+  showToast(`✅ تم نقل "${s.name}" إلى الموقع ${newPos}`);
+  closeContextMenu();
+}
+
+function ctxToggleFavorite() {
+  if (!ctxTargetId) return;
+  const s = shortcuts.find(x => x.id === ctxTargetId);
+  if (!s) return;
+  s.isFavorited = !s.isFavorited;
+  saveShortcuts();
+  renderIcons();
+  renderWelcomeGrid();
+  showToast(s.isFavorited ? `❤️ تم تفضيل "${s.name}"` : `🤍 تم إلغاء تفضيل "${s.name}"`);
   closeContextMenu();
 }
 
