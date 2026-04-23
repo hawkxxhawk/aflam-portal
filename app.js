@@ -78,7 +78,7 @@ let _navigationStack = ['all']; // Track category history for back button
 let editingId = null;
 let ctxTargetId = null;
 let currentIconImage = null;
-let _sortOrder = 'newest'; // 'newest' or 'oldest' - default to newest first
+let _sortOrder = 'newest'; // 'newest', 'oldest', or 'favorites' - default to newest first
 let _currentPage = 1; // Current page for pagination
 const ITEMS_PER_PAGE = 20; // Items per page - reduced for better performance
 
@@ -1328,8 +1328,22 @@ function renderWelcomeGrid() {
     // Inside a specific category
     let filtered = shortcuts.filter(s => s.categoryId === _currentCategory);
 
-    // Sort: explicit order first (set by drag-drop or manual reorder), then by date as tiebreaker
+    // Sort items according to the current sort mode
     filtered.sort((a, b) => {
+      // ── Favorites-first mode ──────────────────────────────────────────
+      if (_sortOrder === 'favorites') {
+        const aFav = a.isFavorited ? 1 : 0;
+        const bFav = b.isFavorited ? 1 : 0;
+        if (aFav !== bFav) return bFav - aFav; // favorited items come first
+        // Within the same group, fall back to manual order then date (newest)
+        const aOrd = a.order ?? 0;
+        const bOrd = b.order ?? 0;
+        if (aOrd !== bOrd) return aOrd - bOrd;
+        const aTime = parseInt(a.id.split('_')[1]) || 0;
+        const bTime = parseInt(b.id.split('_')[1]) || 0;
+        return bTime - aTime;
+      }
+      // ── Oldest / Newest modes ─────────────────────────────────────────
       const aOrd = a.order ?? 0;
       const bOrd = b.order ?? 0;
       if (aOrd !== bOrd) return aOrd - bOrd;
@@ -1838,13 +1852,16 @@ function goHome() {
 
 // ── Toggle sort order ────────────────────────────────────────────────
 function toggleSortOrder() {
-  _sortOrder = _sortOrder === 'newest' ? 'oldest' : 'newest';
+  // Cycle through 3 states: newest → oldest → favorites → newest
+  if (_sortOrder === 'newest') _sortOrder = 'oldest';
+  else if (_sortOrder === 'oldest') _sortOrder = 'favorites';
+  else _sortOrder = 'newest';
+
   localStorage.setItem('rm_sort_order', _sortOrder);
 
-  // Rebuild `order` values based on the chosen date direction for all items
-  // in the current folder — this makes the visual grid update immediately
-  // and keeps manual reordering (ctxChangeOrder) working on top of it.
-  if (_currentCategory && _currentCategory !== 'all') {
+  // Rebuild `order` values for date-based modes so manual reordering keeps working.
+  // For 'favorites' mode, we don't rewrite order values — we apply a runtime overlay.
+  if (_currentCategory && _currentCategory !== 'all' && _sortOrder !== 'favorites') {
     const catItems = shortcuts
       .filter(s => s.categoryId === _currentCategory)
       .sort((a, b) => {
@@ -1859,7 +1876,8 @@ function toggleSortOrder() {
   _currentPage = 1;
   updateSortOrderButton();
   renderWelcomeGrid();
-  showToast(_sortOrder === 'newest' ? '⬆️ الأحدث أولاً' : '⬇️ الأقدم أولاً');
+  const toastMap = { newest: '⬆️ الأحدث أولاً', oldest: '⬇️ الأقدم أولاً', favorites: '❤️ المفضلة أولاً' };
+  showToast(toastMap[_sortOrder]);
 }
 
 // ── Update sort order button & folder bar ────────────────────────────
@@ -1889,15 +1907,22 @@ function updateSortOrderButton() {
   }
 
   // Update sort button label/icon/tooltip
-  if (label) label.textContent = _sortOrder === 'newest' ? 'الأحدث' : 'الأقدم';
+  const labelMap = { newest: 'الأحدث', oldest: 'الأقدم', favorites: '❤️ المفضلة' };
+  const titleMap = {
+    newest:    'مرتب بالأحدث — اضغط للترتيب بالأقدم',
+    oldest:    'مرتب بالأقدم — اضغط لتقديم المفضلة',
+    favorites: 'المفضلة أولاً — اضغط للترتيب بالأحدث'
+  };
+  if (label) label.textContent = labelMap[_sortOrder] ?? 'الأحدث';
   if (icon) {
     icon.style.transition = 'transform 0.35s ease';
-    icon.style.transform  = _sortOrder === 'newest' ? 'rotate(0deg)' : 'rotate(180deg)';
+    // newest=0°, oldest=180°, favorites=90° (heart feel)
+    const rotMap = { newest: '0deg', oldest: '180deg', favorites: '90deg' };
+    icon.style.transform = rotMap[_sortOrder] ?? '0deg';
   }
   if (btn) {
-    btn.title = _sortOrder === 'newest'
-      ? 'مرتب بالأحدث — اضغط للترتيب بالأقدم'
-      : 'مرتب بالأقدم — اضغط للترتيب بالأحدث';
+    btn.title = titleMap[_sortOrder] ?? '';
+    btn.classList.toggle('sort-favorites-active', _sortOrder === 'favorites');
   }
 }
 

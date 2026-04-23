@@ -659,6 +659,17 @@ html {
   border-color: var(--accent) !important;
 }
 
+/* Active state when "favorites first" is selected */
+.folder-sort-btn.sort-favorites-active {
+  background: rgba(229, 9, 20, 0.15) !important;
+  border-color: rgba(229, 9, 20, 0.6) !important;
+  color: #ff6b6b !important;
+}
+
+.folder-sort-btn.sort-favorites-active svg {
+  stroke: #ff6b6b;
+}
+
 .folder-sort-btn svg {
   transition: transform 0.35s ease;
 }
