@@ -103,7 +103,11 @@ function setupDragAndDrop() {
     if (!url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('ftp://')) return;
 
     e.preventDefault();
-    openAddModalWithUrl(url, null);
+    // Pass the home display folder (if on home dashboard) so the modal pre-selects it
+    const targetFolder = (typeof _currentCategory !== 'undefined' && _currentCategory !== 'all')
+      ? _currentCategory
+      : (typeof _homeDisplayFolder !== 'undefined' ? _homeDisplayFolder : null);
+    openAddModalWithUrl(url, targetFolder);
   });
 })();
 
@@ -216,9 +220,11 @@ function handleGridDrop(e) {
   const folderBar = document.getElementById('folderBar');
   if (folderBar) { folderBar.style.borderColor = ''; folderBar.style.background = ''; }
 
-  // Must be inside an open folder
-  const folderId = _currentCategory;
-  if (!folderId || folderId === 'all') {
+  // Determine target folder: opened folder OR home display folder
+  const folderId = (_currentCategory && _currentCategory !== 'all')
+    ? _currentCategory
+    : (typeof _homeDisplayFolder !== 'undefined' ? _homeDisplayFolder : null);
+  if (!folderId) {
     showToast('⚠️ يرجى فتح مجلد أولاً ثم أعد السحب');
     return;
   }

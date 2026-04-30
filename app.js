@@ -79,8 +79,13 @@ let editingId = null;
 let ctxTargetId = null;
 let currentIconImage = null;
 let _sortOrder = 'newest'; // 'newest', 'oldest', or 'favorites' - default to newest first
-let _currentPage = 1; // Current page for pagination
-const ITEMS_PER_PAGE = 20; // Items per page - reduced for better performance
+let _homeSection        = 'movies';           // active section tab on home dashboard
+let _homeDisplayFolder  = 'favorites_folder'; // folder whose items are shown on home dashboard
+let _homeSortOrder      = 'newest';           // 'newest' | 'oldest' | 'favorites' | 'custom'
+let _currentPage = 1; // Current page for pagination (folder views)
+let _homePage    = 1; // Current page for home dashboard
+const ITEMS_PER_PAGE      = 20; // Items per page — folder views
+const HOME_ITEMS_PER_PAGE = 50; // Items per page — home dashboard
 
 // ── Data loading strategy ─────────────────────────────────────────────
 // Priority: localStorage / IndexedDB quick snapshot > initial bundle file > full chunk refresh
@@ -431,7 +436,10 @@ async function exportFavoritesCombined() {
 async function initApp() {
   try {
     // Load user preferences
-    _sortOrder = localStorage.getItem('rm_sort_order') || 'newest';
+    _sortOrder          = localStorage.getItem('rm_sort_order')      || 'newest';
+    _homeSection        = localStorage.getItem('rm_home_section')    || 'movies';
+    _homeDisplayFolder  = localStorage.getItem('rm_home_folder')     || 'favorites_folder';
+    _homeSortOrder      = localStorage.getItem('rm_home_sort_order') || 'newest';
 
     // 1. Load system categories first
     if (!categories.some(c => c.id === 'favorites_folder')) {
@@ -1260,68 +1268,14 @@ function renderWelcomeGrid() {
   }
 
   if (_currentCategory === 'all') {
-    // ENFORCE block layout so sections stack vertically perfectly
     grid.style.display = 'block';
-    // Helper to determine category section robustly (especially for older backups)
-    function getCategorySection(cat) {
-      if (cat.section) return cat.section;
-      if (['favorites_folder', 'favorites_folder_2', 'favorites_folder_3'].includes(cat.id)) return 'movies';
-      return 'sites';
-    }
-
-    // Helper: render one section of folders
-    function renderFolderSection(sectionId, sectionLabel, sectionEmoji, sectionColor) {
-      const sectionCats = categories.filter(cat => !cat.hidden && getCategorySection(cat) === sectionId);
-      if (sectionCats.length === 0) return;
-
-      // Section Wrapper (forces the entire section to take a full row)
-      const sectionWrapper = document.createElement('div');
-      sectionWrapper.className = 'folder-section-wrapper';
-      sectionWrapper.style.cssText = 'width: 100%; display: flex; flex-direction: column; margin-bottom: 24px;';
-
-      // Section header
-      const header = document.createElement('div');
-      header.className = 'folder-section-header';
-      header.style.cssText = `display:flex;align-items:center;gap:10px;padding:4px 10px;margin-bottom:12px;`;
-      header.innerHTML = `
-        <span style="font-size:20px;">${sectionEmoji}</span>
-        <span style="font-size:15px;font-weight:800;color:${sectionColor};letter-spacing:0.5px;">${sectionLabel}</span>
-        <div style="flex:1;height:1px;background:${sectionColor}33;"></div>
-      `;
-      sectionWrapper.appendChild(header);
-
-      // Section Items Row (scrolls horizontally on desktop)
-      const itemsRow = document.createElement('div');
-      itemsRow.className = 'folder-section-items';
-      // Styling handled by style.css for horizontal wrapping vs scrolling
-
-      sectionCats.forEach(cat => {
-        const item = document.createElement('div');
-        item.className = 'welcome-icon-item folder-item';
-        item.title = cat.name;
-
-        let iconColor = '#4a4a6a';
-        if (cat.id === 'favorites_folder') iconColor = '#28a745';
-        if (cat.id === 'favorites_folder_2') iconColor = '#ff6b6b';
-        if (cat.id === 'favorites_folder_3') iconColor = '#e50914';
-
-        item.innerHTML = `
-          <div class="icon-fallback folder-icon" style="width:52px;height:52px;border-radius:12px;background:${iconColor};font-size:24px;">📁</div>
-          <span>${escHtml(cat.name)}</span>
-        `;
-        item.addEventListener('click', () => selectCategory(cat.id));
-        itemsRow.appendChild(item);
-      });
-
-      sectionWrapper.appendChild(itemsRow);
-      grid.appendChild(sectionWrapper);
-    }
-
-    renderFolderSection('sites', 'قسم المواقع', '🌐', '#4fc3f7');
-    renderFolderSection('movies', 'قسم الأفلام', '🎬', '#e50914');
-
+    grid.classList.add('home-dashboard');
+    document.getElementById('welcomeScreen').classList.add('home-dashboard-mode');
+    renderHomeDashboard(grid);
 
   } else {
+    grid.classList.remove('home-dashboard');
+    document.getElementById('welcomeScreen').classList.remove('home-dashboard-mode');
     // Reset grid layout override for regular item viewing
     grid.style.display = '';
 
@@ -1393,8 +1347,11 @@ function renderWelcomeGrid() {
         // Movie card style
         item.classList.add('fav-rectangular-item');
         const accentColor = s.color || '#e50914';
-        const cardBg = s.image || s.bgImage || '';
-        const bgImageStyle = cardBg ? `background-image:url('${cardBg}');` : '';
+        // s.bgImage is the user-set background image; s.image is the site icon (not used as card bg)
+        const cardBg = s.bgImage || '';
+        const bgImageStyle = cardBg
+          ? `background-image:url('${cardBg}');background-size:cover;background-position:center;`
+          : '';
         let borderColor = '';
         if (s.borderColor !== 'transparent') {
           const isOrange = s.borderColor === '#ffa500';
@@ -1447,6 +1404,202 @@ function renderWelcomeGrid() {
   }
 }
 
+// ── Home Dashboard ────────────────────────────────────────────────────
+function renderHomeDashboard(grid) {
+  // Inline section-helper (getCategorySection may not yet be on window during first render)
+  function getCatSec(cat) {
+    if (window.getCategorySection) return window.getCategorySection(cat);
+    if (cat.section) return cat.section;
+    if (['favorites_folder', 'favorites_folder_2', 'favorites_folder_3'].includes(cat.id)) return 'movies';
+    return 'sites';
+  }
+
+  // Validate _homeDisplayFolder belongs to _homeSection; auto-correct if not
+  const folderInSection = categories.find(c => c.id === _homeDisplayFolder && !c.hidden && getCatSec(c) === _homeSection);
+  if (!folderInSection) {
+    const first = categories.find(c => !c.hidden && getCatSec(c) === _homeSection);
+    _homeDisplayFolder = first ? first.id : 'favorites_folder';
+    localStorage.setItem('rm_home_folder', _homeDisplayFolder);
+  }
+
+  // ── 1. Section Navigation Tabs ─────────────────────────────────────
+  const sectionNav = document.createElement('div');
+  sectionNav.className = 'home-section-nav';
+  [{ id: 'movies', label: 'الأفلام', emoji: '🎬' },
+   { id: 'sites',  label: 'المواقع', emoji: '🌐' }
+  ].forEach(sec => {
+    const btn = document.createElement('button');
+    btn.className = 'home-section-tab' + (_homeSection === sec.id ? ' active' : '');
+    btn.innerHTML = `<span class="home-tab-emoji">${sec.emoji}</span><span>${sec.label}</span>`;
+    btn.onclick = () => selectHomeSection(sec.id);
+    sectionNav.appendChild(btn);
+  });
+  grid.appendChild(sectionNav);
+
+  // ── 2. Folder Chips Row ─────────────────────────────────────────────
+  const sectionFolders = categories.filter(c => !c.hidden && getCatSec(c) === _homeSection);
+  if (sectionFolders.length > 0) {
+    const foldersRow = document.createElement('div');
+    foldersRow.className = 'home-folders-row';
+    sectionFolders.forEach(cat => {
+      const chip = document.createElement('button');
+      chip.className = 'home-folder-chip' + (_homeDisplayFolder === cat.id ? ' active' : '');
+      chip.textContent = cat.name;
+      chip.onclick = () => selectHomeFolder(cat.id);
+      foldersRow.appendChild(chip);
+    });
+    grid.appendChild(foldersRow);
+  }
+
+  // ── 2b. Sort Bar ────────────────────────────────────────────────────
+  const sortBar = document.createElement('div');
+  sortBar.className = 'home-sort-bar';
+  sortBar.innerHTML = '<span class="home-sort-label">الترتيب:</span>';
+
+  const sortOptions = [
+    { id: 'newest',    label: '⬆️ الأحدث' },
+    { id: 'oldest',    label: '⬇️ الأقدم' },
+    { id: 'favorites', label: '❤️ المفضلة' },
+    { id: 'custom',    label: '🔢 مخصص'   },
+  ];
+  sortOptions.forEach(opt => {
+    const btn = document.createElement('button');
+    btn.className = 'home-sort-btn' + (_homeSortOrder === opt.id ? ' active' : '');
+    btn.textContent = opt.label;
+    btn.onclick = () => selectHomeSortOrder(opt.id);
+    sortBar.appendChild(btn);
+  });
+  grid.appendChild(sortBar);
+
+  // ── 3. Items Grid ───────────────────────────────────────────────────
+  const displayCatObj = categories.find(c => c.id === _homeDisplayFolder) || { id: _homeDisplayFolder };
+  const secType = getCatSec(displayCatObj);
+  const isFav = ['favorites_folder', 'favorites_folder_2', 'favorites_folder_3'].includes(_homeDisplayFolder);
+
+  const allItems = shortcuts
+    .filter(s => s.categoryId === _homeDisplayFolder)
+    .sort((a, b) => {
+      // ── المفضلة أولاً ──
+      if (_homeSortOrder === 'favorites') {
+        const aF = a.isFavorited ? 1 : 0, bF = b.isFavorited ? 1 : 0;
+        if (aF !== bF) return bF - aF;
+        // within group: by order then date desc
+        const aO = a.order ?? 0, bO = b.order ?? 0;
+        if (aO !== bO) return aO - bO;
+        return (parseInt(b.id.split('_')[1]) || 0) - (parseInt(a.id.split('_')[1]) || 0);
+      }
+      // ── ترتيب المستخدم (حقل order فقط) ──
+      if (_homeSortOrder === 'custom') {
+        return (a.order ?? 0) - (b.order ?? 0);
+      }
+      // ── الأحدث / الأقدم (بالتاريخ) ──
+      const aT = parseInt(a.id.split('_')[1]) || 0;
+      const bT = parseInt(b.id.split('_')[1]) || 0;
+      return _homeSortOrder === 'newest' ? bT - aT : aT - bT;
+    });
+
+  // ── Pagination calculation ─────────────────────────────────────────
+  const totalHomeItems = allItems.length;
+  const totalHomePages = Math.max(1, Math.ceil(totalHomeItems / HOME_ITEMS_PER_PAGE));
+  if (_homePage > totalHomePages) _homePage = totalHomePages;
+  if (_homePage < 1) _homePage = 1;
+  const homeStart = (_homePage - 1) * HOME_ITEMS_PER_PAGE;
+  const homeEnd   = homeStart + HOME_ITEMS_PER_PAGE;
+  const pageItems = allItems.slice(homeStart, homeEnd);
+
+  const itemsGrid = document.createElement('div');
+  itemsGrid.className = 'home-items-grid' + (secType === 'sites' ? ' home-sites-grid' : '');
+
+  if (totalHomeItems === 0) {
+    const msg = document.createElement('div');
+    msg.className = 'home-empty-msg';
+    msg.textContent = 'لا توجد عناصر في هذا المجلد بعد — أضف مواقع أو اسحب روابط إلى هنا';
+    itemsGrid.appendChild(msg);
+  } else {
+    pageItems.forEach((s, idx) => {
+      const globalIdx = homeStart + idx + 1; // 1-based global number
+      const item = document.createElement('div');
+      item.className = 'welcome-icon-item home-item';
+      item.dataset.id = s.id;
+
+      if (secType === 'movies' || isFav) {
+        item.classList.add('fav-rectangular-item');
+        const ac = s.color || '#e50914';
+        const bg = s.bgImage ? `background-image:url('${s.bgImage}');background-size:cover;background-position:center;` : '';
+        const bcRaw = s.borderColor;
+        const bc = bcRaw && bcRaw !== 'transparent'
+          ? `border-color:${bcRaw};border-width:${bcRaw === '#ffa500' ? '5px' : '3px'};border-style:${bcRaw === '#ffa500' ? 'double' : 'solid'};`
+          : '';
+        item.innerHTML = `
+          <div class="item-number">${globalIdx}</div>
+          ${s.isFavorited ? '<div class="item-heart">❤️</div>' : ''}
+          <div class="fav-rect-frame" style="--item-color:${ac};${bg}${bc}">
+            <div class="fav-rect-overlay"></div>
+            <span class="fav-rect-name">${escHtml(s.name)}</span>
+          </div>`;
+      } else {
+        item.innerHTML = `
+          <div class="item-number">${globalIdx}</div>
+          ${s.isFavorited ? '<div class="item-heart">❤️</div>' : ''}
+          ${buildIconImg(s, 72)}
+          <span>${escHtml(s.name)}</span>`;
+      }
+
+      item.addEventListener('click', () => openSite(s));
+      item.addEventListener('contextmenu', e => openContextMenu(e, s.id));
+      itemsGrid.appendChild(item);
+    });
+  }
+  grid.appendChild(itemsGrid);
+
+  // ── Pagination controls (bottom) ───────────────────────────────────
+  if (totalHomePages > 1) {
+    const pg = createPaginationControls(totalHomePages, _homePage, changeHomePage);
+    // Override inline style for home context (not inside a CSS grid, so no grid-column needed)
+    pg.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:8px;padding:20px 16px 30px;flex-wrap:wrap;';
+    grid.appendChild(pg);
+  }
+}
+
+// ── Select home section (section tab click) ───────────────────────────
+function selectHomeSection(sectionId) {
+  _homeSection = sectionId;
+  _homePage = 1; // reset to first page on section change
+  localStorage.setItem('rm_home_section', sectionId);
+  // Auto-select first folder in the new section if current folder isn't in it
+  function getCatSec(cat) {
+    if (window.getCategorySection) return window.getCategorySection(cat);
+    if (cat.section) return cat.section;
+    if (['favorites_folder', 'favorites_folder_2', 'favorites_folder_3'].includes(cat.id)) return 'movies';
+    return 'sites';
+  }
+  const stillValid = categories.find(c => c.id === _homeDisplayFolder && !c.hidden && getCatSec(c) === sectionId);
+  if (!stillValid) {
+    const first = categories.find(c => !c.hidden && getCatSec(c) === sectionId);
+    _homeDisplayFolder = first ? first.id : _homeDisplayFolder;
+    localStorage.setItem('rm_home_folder', _homeDisplayFolder);
+  }
+  renderWelcomeGrid();
+}
+
+// ── Select home display folder (folder chip click) ────────────────────
+function selectHomeFolder(folderId) {
+  _homeDisplayFolder = folderId;
+  _homePage = 1; // reset to first page on folder change
+  localStorage.setItem('rm_home_folder', folderId);
+  renderWelcomeGrid();
+}
+
+// ── Select home sort order ─────────────────────────────────────────────
+function selectHomeSortOrder(order) {
+  _homeSortOrder = order;
+  _homePage = 1; // reset to page 1 on sort change
+  localStorage.setItem('rm_home_sort_order', order);
+  renderWelcomeGrid();
+  const labels = { newest: '⬆️ الأحدث أولاً', oldest: '⬇️ الأقدم أولاً', favorites: '❤️ المفضلة أولاً', custom: '🔢 ترتيب مخصص' };
+  showToast(labels[order] || '');
+}
+
 // ── Build icon image/fallback HTML ────────────────────────────────────
 function buildIconImg(s, size) {
   const bgStyle = s.bgImage ? `background-image:url('${s.bgImage}');background-size:cover;background-position:center;` : '';
@@ -1461,7 +1614,11 @@ function buildIconImg(s, size) {
 }
 
 // ── Create pagination controls ─────────────────────────────────────────
-function createPaginationControls(totalPages) {
+// curPage & gotoFn are optional — defaults to folder-view globals
+function createPaginationControls(totalPages, curPage, gotoFn) {
+  curPage = (curPage != null) ? curPage : _currentPage;
+  gotoFn  = gotoFn  || changePage;
+
   const controls = document.createElement('div');
   controls.className = 'pagination-controls';
   controls.style.cssText = `
@@ -1472,25 +1629,26 @@ function createPaginationControls(totalPages) {
     gap: 8px;
     padding: 16px;
     margin: 10px 0;
+    flex-wrap: wrap;
   `;
 
   // Previous button
   const prevBtn = document.createElement('button');
   prevBtn.className = 'pagination-btn';
   prevBtn.innerHTML = '⬅️';
-  prevBtn.disabled = _currentPage <= 1;
-  prevBtn.onclick = () => changePage(_currentPage - 1);
+  prevBtn.disabled = curPage <= 1;
+  prevBtn.onclick = () => gotoFn(curPage - 1);
   controls.appendChild(prevBtn);
 
-  // Page numbers
-  const startPage = Math.max(1, _currentPage - 2);
-  const endPage = Math.min(totalPages, _currentPage + 2);
+  // Page numbers (show ±2 around current)
+  const startPage = Math.max(1, curPage - 2);
+  const endPage = Math.min(totalPages, curPage + 2);
 
   if (startPage > 1) {
     const firstBtn = document.createElement('button');
     firstBtn.className = 'pagination-btn';
     firstBtn.textContent = '1';
-    firstBtn.onclick = () => changePage(1);
+    firstBtn.onclick = () => gotoFn(1);
     controls.appendChild(firstBtn);
 
     if (startPage > 2) {
@@ -1504,9 +1662,9 @@ function createPaginationControls(totalPages) {
   for (let i = startPage; i <= endPage; i++) {
     const pageBtn = document.createElement('button');
     pageBtn.className = 'pagination-btn';
-    if (i === _currentPage) pageBtn.classList.add('active');
+    if (i === curPage) pageBtn.classList.add('active');
     pageBtn.textContent = i;
-    pageBtn.onclick = () => changePage(i);
+    pageBtn.onclick = () => gotoFn(i);
     controls.appendChild(pageBtn);
   }
 
@@ -1521,7 +1679,7 @@ function createPaginationControls(totalPages) {
     const lastBtn = document.createElement('button');
     lastBtn.className = 'pagination-btn';
     lastBtn.textContent = totalPages;
-    lastBtn.onclick = () => changePage(totalPages);
+    lastBtn.onclick = () => gotoFn(totalPages);
     controls.appendChild(lastBtn);
   }
 
@@ -1529,18 +1687,24 @@ function createPaginationControls(totalPages) {
   const nextBtn = document.createElement('button');
   nextBtn.className = 'pagination-btn';
   nextBtn.innerHTML = '➡️';
-  nextBtn.disabled = _currentPage >= totalPages;
-  nextBtn.onclick = () => changePage(_currentPage + 1);
+  nextBtn.disabled = curPage >= totalPages;
+  nextBtn.onclick = () => gotoFn(curPage + 1);
   controls.appendChild(nextBtn);
 
   return controls;
 }
 
-// ── Change page ───────────────────────────────────────────────────────
+// ── Change page (folder views) ────────────────────────────────────────
 function changePage(page) {
   _currentPage = page;
   renderWelcomeGrid();
-  // Scroll to top instantly for better performance
+  window.scrollTo(0, 0);
+}
+
+// ── Change page (home dashboard) ──────────────────────────────────────
+function changeHomePage(page) {
+  _homePage = page;
+  renderWelcomeGrid();
   window.scrollTo(0, 0);
 }
 

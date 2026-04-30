@@ -674,6 +674,201 @@ html {
   transition: transform 0.35s ease;
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   HOME DASHBOARD — Professional movie portal homepage
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* Hide the generic welcome intro text when the dashboard is active */
+#welcomeScreen.home-dashboard-mode .welcome-content {
+  display: none !important;
+}
+
+/* Grid container becomes a vertical flex column in dashboard mode */
+#welcomeIconsGrid.home-dashboard {
+  display: flex !important;
+  flex-direction: column !important;
+  flex-wrap: nowrap !important;
+  align-items: stretch !important;
+  gap: 0 !important;
+  padding: 0 !important;
+  overflow-x: hidden !important;
+  justify-content: flex-start !important;
+}
+
+/* ── Section Navigation Tabs (🎬 الأفلام | 🌐 المواقع) ── */
+.home-section-nav {
+  display: flex;
+  gap: 10px;
+  padding: 18px 14px 10px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.home-section-tab {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 11px 28px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid transparent;
+  border-radius: 14px;
+  color: var(--text-muted);
+  font-family: 'Cairo', sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  cursor: pointer;
+  transition: background 0.22s, border-color 0.22s, color 0.22s, transform 0.15s;
+}
+
+.home-section-tab.active {
+  background: rgba(229, 9, 20, 0.18);
+  border-color: var(--accent);
+  color: #fff;
+  box-shadow: 0 0 20px rgba(229, 9, 20, 0.2);
+}
+
+.home-section-tab:hover:not(.active) {
+  background: rgba(255, 255, 255, 0.09);
+  color: var(--text);
+  transform: translateY(-1px);
+}
+
+.home-tab-emoji {
+  font-size: 20px;
+  line-height: 1;
+}
+
+/* ── Folder Chips Row ── */
+.home-folders-row {
+  display: flex;
+  gap: 8px;
+  padding: 10px 14px 12px;
+  overflow-x: auto;
+  flex-wrap: nowrap;
+  scrollbar-width: none;
+  flex-shrink: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.home-folders-row::-webkit-scrollbar { display: none; }
+
+.home-folder-chip {
+  padding: 6px 18px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  color: var(--text-muted);
+  font-family: 'Cairo', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.home-folder-chip.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  box-shadow: 0 2px 12px rgba(229, 9, 20, 0.4);
+}
+
+.home-folder-chip:hover:not(.active) {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* ── Sort Bar ── */
+.home-sort-bar {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 14px 11px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.home-sort-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 700;
+  white-space: nowrap;
+  margin-left: 2px;
+  opacity: .8;
+}
+
+.home-sort-btn {
+  padding: 5px 13px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  color: var(--text-muted);
+  font-family: 'Cairo', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.18s, border-color 0.18s, color 0.18s;
+  white-space: nowrap;
+}
+
+.home-sort-btn.active {
+  background: rgba(229, 9, 20, 0.2);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.home-sort-btn:hover:not(.active) {
+  background: rgba(255, 255, 255, 0.11);
+  color: var(--text);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+@media (max-width: 768px) {
+  .home-sort-bar { padding: 7px 10px 9px; gap: 5px; }
+  .home-sort-btn { font-size: 11px; padding: 4px 10px; }
+}
+
+/* ── Items Grid (5-column movie cards) ── */
+.home-items-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+  padding: 14px 12px 30px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Sites section: auto-fill smaller cards */
+.home-sites-grid {
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+}
+
+.home-empty-msg {
+  grid-column: 1 / -1;
+  padding: 60px 20px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 2;
+}
+
+/* Home items share the same card styling as folder items */
+.home-item { animation: fadeUp 0.3s ease both; }
+
+@media screen and (max-width: 768px) {
+  .home-items-grid { grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 10px 8px 24px; }
+  .home-section-tab { padding: 9px 16px; font-size: 13px; }
+  .home-section-nav { padding: 12px 10px 8px; gap: 8px; }
+  .home-folders-row { padding: 8px 10px 10px; }
+}
+
+@media screen and (max-width: 480px) {
+  .home-items-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
 @media screen and (max-width: 768px) {
   .folder-bar {
     width: calc(100% - 12px);
