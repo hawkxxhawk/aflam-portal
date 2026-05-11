@@ -21,6 +21,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="iptv.css" />
+  <link rel="stylesheet" href="search.css" />
   <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
@@ -74,6 +75,15 @@
           <!-- Populated by JS -->
         </div>
       </div>
+
+      <!-- Search Engine Button -->
+      <button id="searchBtn" class="ctrl-btn" title="البحث عن أفلام" onclick="SearchEngine.activate()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"></circle>
+          <path d="m21 21-4.35-4.35"></path>
+        </svg>
+        <span>بحث</span>
+      </button>
     </div>
 
     <div id="iconsStrip" class="icons-strip">
@@ -212,6 +222,27 @@
     <div id="updateProgressLabel">جاري تحديث البيانات في الخلفية...</div>
     <div id="updateProgressBarOuter">
       <div id="updateProgressFill"></div>
+    </div>
+  </div>
+
+  <!-- ===== SEARCH ENGINE ===== -->
+  <div id="searchWrapper" class="search-wrapper hidden">
+    <div class="search-container">
+      <div class="search-input-group">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"></circle>
+          <path d="m21 21-4.35-4.35"></path>
+        </svg>
+        <input 
+          type="text" 
+          id="searchInput" 
+          class="search-input" 
+          placeholder="ابحث عن أفلام أو مواقع..."
+          autocomplete="off"
+        >
+        <button class="search-close" onclick="SearchEngine.closeSearch()" title="إغلاق">✕</button>
+      </div>
+      <div id="searchResultsContainer" class="search-results-container hidden"></div>
     </div>
   </div>
 
@@ -601,6 +632,7 @@
   <script src="app.js"></script>
   <script src="iptv.js"></script>
   <script src="drag-drop-new.js"></script>
+  <script src="search.js"></script>
 </body>
 
 </html>

@@ -1151,6 +1151,7 @@ async function importDataFile(event) {
       renderCategorySelector();
       renderIcons();
       renderWelcomeGrid();
+      updateSortOrderButton(); // تحديث عداد العناصر بعد الاستيراد
     }
 
     if (data.iptv_sources && typeof IPTV !== 'undefined') {
@@ -1444,7 +1445,8 @@ function renderHomeDashboard(grid) {
     sectionFolders.forEach(cat => {
       const chip = document.createElement('button');
       chip.className = 'home-folder-chip' + (_homeDisplayFolder === cat.id ? ' active' : '');
-      chip.textContent = cat.name;
+      const catCount = shortcuts.filter(s => s.categoryId === cat.id).length;
+      chip.innerHTML = `${escHtml(cat.name)} <span class="chip-count">${catCount}</span>`;
       chip.onclick = () => selectHomeFolder(cat.id);
       foldersRow.appendChild(chip);
     });
@@ -1980,7 +1982,8 @@ function goHome() {
   _navigationStack = ['all']; // Reset stack
   _currentCategory = 'all';
 
-  document.getElementById('currentCategoryLabel').textContent = 'كل المواقع';
+  const allCount = shortcuts.length;
+  document.getElementById('currentCategoryLabel').innerHTML = `كل المواقع <span class="cat-item-count">${allCount}</span>`;
 
   // Show title bar and hide back button
   document.getElementById('titleBar').classList.remove('hidden');
@@ -2158,6 +2161,7 @@ function ctxDelete() {
     saveShortcuts();
     renderIcons();
     renderWelcomeGrid();
+    updateSortOrderButton(); // تحديث عداد العناصر
     // If this was the active site, go home
     goHome();
   }
@@ -2220,6 +2224,7 @@ function ctxToggleFavorite() {
   saveShortcuts();
   renderIcons();
   renderWelcomeGrid();
+  updateSortOrderButton(); // تحديث عداد العناصر عند تغيير حالة المفضلة
   showToast(s.isFavorited ? `❤️ تم تفضيل "${s.name}"` : `🤍 تم إلغاء تفضيل "${s.name}"`);
   closeContextMenu();
 }
@@ -2535,6 +2540,7 @@ function saveShortcut() {
   saveShortcuts();
   renderIcons();
   renderWelcomeGrid();
+  updateSortOrderButton(); // تحديث عداد العناصر في شريط المجلد
   closeModal();
 }
 
@@ -2596,14 +2602,21 @@ function renderCategorySelector() {
   if (menu) {
     const sitesCats = categories.filter(c => !c.hidden && catSection(c) === 'sites');
     const moviesCats = categories.filter(c => !c.hidden && catSection(c) === 'movies');
-    let html = `<button onclick="selectCategory('all')">📂 كل المواقع</button>`;
+    const allCount = shortcuts.length;
+    let html = `<button onclick="selectCategory('all')">📂 كل المواقع <span class="cat-item-count">${allCount}</span></button>`;
     if (sitesCats.length) {
       html += `<hr class="dropdown-divider"/><div class="dropdown-section-label">🌐 قسم المواقع</div>`;
-      sitesCats.forEach(c => { html += `<button onclick="selectCategory('${c.id}')">📁 ${escHtml(c.name)}</button>`; });
+      sitesCats.forEach(c => {
+        const cnt = shortcuts.filter(s => s.categoryId === c.id).length;
+        html += `<button onclick="selectCategory('${c.id}')">📁 ${escHtml(c.name)} <span class="cat-item-count">${cnt}</span></button>`;
+      });
     }
     if (moviesCats.length) {
       html += `<hr class="dropdown-divider"/><div class="dropdown-section-label">🎬 قسم الأفلام</div>`;
-      moviesCats.forEach(c => { html += `<button onclick="selectCategory('${c.id}')">📁 ${escHtml(c.name)}</button>`; });
+      moviesCats.forEach(c => {
+        const cnt = shortcuts.filter(s => s.categoryId === c.id).length;
+        html += `<button onclick="selectCategory('${c.id}')">📁 ${escHtml(c.name)} <span class="cat-item-count">${cnt}</span></button>`;
+      });
     }
     menu.innerHTML = html;
   }
@@ -2642,7 +2655,8 @@ function selectCategory(id) {
   }
 
   const label = id === 'all' ? 'كل المواقع' : (categories.find(c => c.id === id)?.name || 'كل المواقع');
-  document.getElementById('currentCategoryLabel').textContent = label;
+  const itemCount = id === 'all' ? shortcuts.length : shortcuts.filter(s => s.categoryId === id).length;
+  document.getElementById('currentCategoryLabel').innerHTML = `${escHtml(label)} <span class="cat-item-count">${itemCount}</span>`;
 
   // Update title bar
   const titleBar = document.getElementById('titleBar');
@@ -2709,7 +2723,8 @@ function goBackView() {
     _currentCategory = prev;
 
     const label = _currentCategory === 'all' ? 'كل المواقع' : (categories.find(c => c.id === _currentCategory)?.name || 'كل المواقع');
-    document.getElementById('currentCategoryLabel').textContent = label;
+    const itemCount = _currentCategory === 'all' ? shortcuts.length : shortcuts.filter(s => s.categoryId === _currentCategory).length;
+    document.getElementById('currentCategoryLabel').innerHTML = `${escHtml(label)} <span class="cat-item-count">${itemCount}</span>`;
 
     renderIcons();
     renderWelcomeGrid();
