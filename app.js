@@ -406,12 +406,22 @@ async function exportFavoritesCombined() {
     { categoryId: 'favorites_folder_3', filename: 'favourit3.json', displayName: 'مفضلة 3' }
   ];
 
+  // Ensure we have full data (with images) from IndexedDB if not in memory
+  let exportShortcuts = Array.isArray(shortcuts) && shortcuts.length > 0 ? shortcuts : null;
+  if (!exportShortcuts && typeof IPTV_DB !== 'undefined') {
+    try {
+      const dbShortcuts = await IPTV_DB.get('rm_shortcuts');
+      if (Array.isArray(dbShortcuts) && dbShortcuts.length > 0) exportShortcuts = dbShortcuts;
+    } catch (e) { console.warn('Export favs: IndexedDB read failed', e); }
+  }
+  if (!exportShortcuts) exportShortcuts = JSON.parse(localStorage.getItem('rm_shortcuts') || '[]');
+
   const zip = new JSZip();
   const dbFolder = zip.folder('database_chunks');
   let hasAnyFavorites = false;
 
   favoriteFiles.forEach(item => {
-    const favs = shortcuts
+    const favs = exportShortcuts
       .filter(s => s.categoryId === item.categoryId)
       .map(({ isExternalFav, ...rest }) => rest);
     if (favs.length > 0) hasAnyFavorites = true;
@@ -781,15 +791,26 @@ function ensureShortcutOrders() {
 async function exportData() {
   showToast('⏳ جاري تجميع كل البيانات والتقسيم...');
 
-  // Ensure shortcuts and categories are current
-  const currentShortcuts = Array.isArray(shortcuts) && shortcuts.length > 0 ? shortcuts : JSON.parse(localStorage.getItem('rm_shortcuts') || '[]');
-  const currentCategories = Array.isArray(categories) && categories.length > 0 ? categories : JSON.parse(localStorage.getItem('rm_categories') || '[{"id":"general","name":"عام"}]');
+  // Ensure shortcuts and categories are current — prefer in-memory, then IndexedDB (full data), then localStorage (lightweight)
+  let currentShortcuts = Array.isArray(shortcuts) && shortcuts.length > 0 ? shortcuts : null;
+  let currentCategories = Array.isArray(categories) && categories.length > 0 ? categories : null;
+
+  if (!currentShortcuts && typeof IPTV_DB !== 'undefined') {
+    try {
+      const dbShortcuts = await IPTV_DB.get('rm_shortcuts');
+      if (Array.isArray(dbShortcuts) && dbShortcuts.length > 0) currentShortcuts = dbShortcuts;
+      const dbCategories = await IPTV_DB.get('rm_categories');
+      if (Array.isArray(dbCategories) && dbCategories.length > 0) currentCategories = dbCategories;
+    } catch (e) { console.warn('Export: IndexedDB read failed', e); }
+  }
+  if (!currentShortcuts) currentShortcuts = JSON.parse(localStorage.getItem('rm_shortcuts') || '[]');
+  if (!currentCategories) currentCategories = JSON.parse(localStorage.getItem('rm_categories') || '[{"id":"general","name":"عام"}]');
 
   const payload = {
     _comment: 'ملف بيانات بوابة الأفلام — ضعه في مجلد database_chunks عند الرفع على الاستضافة',
     version: 2,
     exported: new Date().toISOString(),
-    shortcuts: [], // Shortcuts are now exported in separate files
+    shortcuts: currentShortcuts,
     categories: currentCategories,
   };
 
@@ -1140,10 +1161,35 @@ async function importDataFile(event) {
       }
     }
 
+    if (!data.shortcuts || data.shortcuts.length === 0) {
+      showToast('⚠️ لم يتم العثور على بيانات للاستيراد في الملف');
+    }
+
     if (data.shortcuts && data.shortcuts.length > 0) {
-      shortcuts = data.shortcuts;
-      categories = data.categories || [{ id: 'general', name: 'عام' }];
-      shortcuts.forEach(s => { if (!s.categoryId) s.categoryId = 'general'; });
+      // Merge imported shortcuts with existing local data instead of replacing
+      const existingIds = new Set(shortcuts.map(s => s.id));
+      const mergedShortcuts = [...shortcuts];
+      let newCount = 0;
+      data.shortcuts.forEach(s => {
+        if (!s.categoryId) s.categoryId = 'general';
+        if (!existingIds.has(s.id)) {
+          mergedShortcuts.push(s);
+          newCount++;
+        }
+      });
+      shortcuts = mergedShortcuts;
+
+      // Merge categories
+      if (Array.isArray(data.categories)) {
+        const existingCatIds = new Set(categories.map(c => c.id));
+        data.categories.forEach(cat => {
+          if (!existingCatIds.has(cat.id)) {
+            categories.push(cat);
+            existingCatIds.add(cat.id);
+          }
+        });
+      }
+
       migrateCategoryIds();
       mergeDuplicateCategories();
       deduplicateShortcuts();
@@ -1151,7 +1197,8 @@ async function importDataFile(event) {
       renderCategorySelector();
       renderIcons();
       renderWelcomeGrid();
-      updateSortOrderButton(); // تحديث عداد العناصر بعد الاستيراد
+      updateSortOrderButton();
+      showToast(`✅ تم استيراد البيانات بنجاح — ${newCount} عنصر جديد`);
     }
 
     if (data.iptv_sources && typeof IPTV !== 'undefined') {
@@ -1178,7 +1225,6 @@ async function importDataFile(event) {
       localStorage.setItem('rm_iptv_player', IPTV.playerChoice);
     }
 
-    showToast('✅ تم استيراد البيانات بنجاح');
   } catch (err) {
     console.error(err);
     showToast('❌ ملف غير صالح أو تالف');
