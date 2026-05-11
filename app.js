@@ -153,9 +153,10 @@ async function loadDataFromChunks(progressCallback = null) {
           try {
             const catRes = await fetch(`./database_chunks/${cat.id}.json?_=${Date.now()}`);
             if (catRes.ok) {
-              const catShortcuts = await catRes.json();
-              if (Array.isArray(catShortcuts)) {
-                data.shortcuts = data.shortcuts.concat(catShortcuts);
+              const catParsed = await catRes.json();
+              const catItems = unwrapItems(catParsed);
+              if (catItems.length) {
+                data.shortcuts = data.shortcuts.concat(catItems);
               }
             }
           } catch (e) {
@@ -307,12 +308,20 @@ async function backgroundRefreshFromChunks(preserveLocal = false, showToasts = t
 }
 
 // ── Favorites File Logic ──────────────────────────────────────────────
+// Helper: extract items array from JSON that may be a raw array or wrapped in { items: [...] }
+function unwrapItems(parsed) {
+  if (Array.isArray(parsed)) return parsed;
+  if (parsed && Array.isArray(parsed.items)) return parsed.items;
+  return [];
+}
+
 async function loadFavoritesFromFile() {
   try {
     const res = await fetch('./favourit.json?_=' + Date.now());
     if (res.ok) {
-      const favs = await res.json();
-      if (Array.isArray(favs)) {
+      const raw = await res.json();
+      const favs = unwrapItems(raw);
+      if (favs.length) {
         return favs.map(f => ({ ...f, categoryId: 'favorites_folder', isExternalFav: true }));
       }
     }
@@ -328,8 +337,8 @@ async function loadFavoritesFromChunks() {
   try {
     const fav1Res = await fetch('./database_chunks/favourit.json?_=' + Date.now());
     if (fav1Res.ok) {
-      const fav1Data = await fav1Res.json();
-      if (Array.isArray(fav1Data)) {
+      const fav1Data = unwrapItems(await fav1Res.json());
+      if (fav1Data.length) {
         favs1 = fav1Data.map(f => ({ ...f, categoryId: 'favorites_folder', isExternalFav: true }));
       }
     }
@@ -338,8 +347,8 @@ async function loadFavoritesFromChunks() {
   try {
     const fav2Res = await fetch('./database_chunks/favourit2.json?_=' + Date.now());
     if (fav2Res.ok) {
-      const fav2Data = await fav2Res.json();
-      if (Array.isArray(fav2Data)) {
+      const fav2Data = unwrapItems(await fav2Res.json());
+      if (fav2Data.length) {
         favs2 = fav2Data.map(f => ({ ...f, categoryId: 'favorites_folder_2', isExternalFav: true }));
       }
     }
@@ -348,8 +357,8 @@ async function loadFavoritesFromChunks() {
   try {
     const fav3Res = await fetch('./database_chunks/favourit3.json?_=' + Date.now());
     if (fav3Res.ok) {
-      const fav3Data = await fav3Res.json();
-      if (Array.isArray(fav3Data)) {
+      const fav3Data = unwrapItems(await fav3Res.json());
+      if (fav3Data.length) {
         favs3 = fav3Data.map(f => ({ ...f, categoryId: 'favorites_folder_3', isExternalFav: true }));
       }
     }
@@ -362,8 +371,9 @@ async function loadFavorites2FromFile() {
   try {
     const res = await fetch('./favourit2.json?_=' + Date.now());
     if (res.ok) {
-      const favs = await res.json();
-      if (Array.isArray(favs)) {
+      const raw = await res.json();
+      const favs = unwrapItems(raw);
+      if (favs.length) {
         return favs.map(f => ({ ...f, categoryId: 'favorites_folder_2', isExternalFav: true }));
       }
     }
@@ -375,8 +385,9 @@ async function loadFavorites3FromFile() {
   try {
     const res = await fetch('./favourit3.json?_=' + Date.now());
     if (res.ok) {
-      const favs = await res.json();
-      if (Array.isArray(favs)) {
+      const raw = await res.json();
+      const favs = unwrapItems(raw);
+      if (favs.length) {
         return favs.map(f => ({ ...f, categoryId: 'favorites_folder_3', isExternalFav: true }));
       }
     }
@@ -391,7 +402,14 @@ async function exportFavoritesOnly() {
     return;
   }
   const cleanFavs = favs.map(({ isExternalFav, ...rest }) => rest);
-  const blob = new Blob([JSON.stringify(cleanFavs, null, 2)], { type: 'application/json' });
+  const payload = {
+    _total_count: cleanFavs.length,
+    _category_id: 'favorites_folder',
+    _category_name: 'المفضلة',
+    _exported: new Date().toISOString(),
+    items: cleanFavs
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url; a.download = 'favourit.json'; a.click();
@@ -425,7 +443,14 @@ async function exportFavoritesCombined() {
       .filter(s => s.categoryId === item.categoryId)
       .map(({ isExternalFav, ...rest }) => rest);
     if (favs.length > 0) hasAnyFavorites = true;
-    dbFolder.file(item.filename, JSON.stringify(favs, null, 2));
+    const favPayload = {
+      _total_count: favs.length,
+      _category_id: item.categoryId,
+      _category_name: item.displayName,
+      _exported: new Date().toISOString(),
+      items: favs
+    };
+    dbFolder.file(item.filename, JSON.stringify(favPayload, null, 2));
   });
 
   if (!hasAnyFavorites) {
@@ -881,6 +906,8 @@ async function exportData() {
     const initialPayload = {
       version: payload.version,
       exported: payload.exported,
+      _total_count: currentShortcuts.length,
+      _categories_count: currentCategories.length,
       shortcuts: currentShortcuts.slice(0, 50),
       categories: currentCategories,
       _comment: 'هذا الملف للتحميل الأولي السريع من مجلد database_chunks'
@@ -897,15 +924,16 @@ async function exportData() {
       .filter(s => s.categoryId === 'favorites_folder_3')
       .map(({ isExternalFav, ...rest }) => rest);
 
-    dbFolder.file('favourit.json', JSON.stringify(favouritesPayload, null, 2));
-    dbFolder.file('favourit2.json', JSON.stringify(favourites2Payload, null, 2));
-    dbFolder.file('favourit3.json', JSON.stringify(favourites3Payload, null, 2));
+    dbFolder.file('favourit.json', JSON.stringify({ _total_count: favouritesPayload.length, _category_id: 'favorites_folder', _category_name: 'المفضلة', _exported: new Date().toISOString(), items: favouritesPayload }, null, 2));
+    dbFolder.file('favourit2.json', JSON.stringify({ _total_count: favourites2Payload.length, _category_id: 'favorites_folder_2', _category_name: 'مفضلة 2', _exported: new Date().toISOString(), items: favourites2Payload }, null, 2));
+    dbFolder.file('favourit3.json', JSON.stringify({ _total_count: favourites3Payload.length, _category_id: 'favorites_folder_3', _category_name: 'مفضلة 3', _exported: new Date().toISOString(), items: favourites3Payload }, null, 2));
 
     const systemFavs = ['favorites_folder', 'favorites_folder_2', 'favorites_folder_3'];
     currentCategories.forEach(cat => {
       if (!systemFavs.includes(cat.id)) {
         const catShortcuts = currentShortcuts.filter(s => s.categoryId === cat.id);
-        dbFolder.file(`${cat.id}.json`, JSON.stringify(catShortcuts, null, 2));
+        const catPayload = { _total_count: catShortcuts.length, _category_id: cat.id, _category_name: cat.name, _exported: new Date().toISOString(), items: catShortcuts };
+        dbFolder.file(`${cat.id}.json`, JSON.stringify(catPayload, null, 2));
       }
     });
 
@@ -954,12 +982,14 @@ function extractShortcutsFromJson(parsed, targetCategoryId = null) {
   if (Array.isArray(parsed)) {
     rawArray = parsed;
   } else if (typeof parsed === 'object' && parsed !== null) {
-    if (Array.isArray(parsed.movies_info)) rawArray = parsed.movies_info;
+    // Support new export format with _total_count and items wrapper
+    if (Array.isArray(parsed.items)) rawArray = parsed.items;
+    else if (Array.isArray(parsed.movies_info)) rawArray = parsed.movies_info;
     else if (Array.isArray(parsed.series_info)) rawArray = parsed.series_info;
     else if (Array.isArray(parsed.movies)) rawArray = parsed.movies;
     else {
       for (const key in parsed) {
-        if (Array.isArray(parsed[key])) {
+        if (Array.isArray(parsed[key]) && !key.startsWith('_')) {
           rawArray = parsed[key];
           break;
         }
@@ -1141,8 +1171,9 @@ async function importDataFile(event) {
             if (catFile) {
               try {
                 const catText = await catFile.async("string");
-                const catShortcuts = JSON.parse(catText);
-                if (Array.isArray(catShortcuts)) data.shortcuts = data.shortcuts.concat(catShortcuts);
+                const catParsed = JSON.parse(catText);
+                const catItems = Array.isArray(catParsed) ? catParsed : (Array.isArray(catParsed.items) ? catParsed.items : []);
+                if (catItems.length) data.shortcuts = data.shortcuts.concat(catItems);
               } catch (e) { }
             }
           }
@@ -1154,8 +1185,9 @@ async function importDataFile(event) {
         if (fFile) {
           try {
             const fText = await fFile.async("string");
-            const fShortcuts = JSON.parse(fText);
-            if (Array.isArray(fShortcuts)) data.shortcuts = data.shortcuts.concat(fShortcuts);
+            const fParsed = JSON.parse(fText);
+            const fItems = Array.isArray(fParsed) ? fParsed : (Array.isArray(fParsed.items) ? fParsed.items : []);
+            if (fItems.length) data.shortcuts = data.shortcuts.concat(fItems);
           } catch (e) { }
         }
       }
