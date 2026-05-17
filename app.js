@@ -495,7 +495,13 @@ async function initApp() {
       shortcuts = quickSnapshot.shortcuts;
       if (Array.isArray(quickSnapshot.categories) && quickSnapshot.categories.length > 0) {
         quickSnapshot.categories.forEach(c => {
-          if (!categories.some(exist => exist.id === c.id)) categories.push(c);
+          const existing = categories.find(exist => exist.id === c.id);
+          if (existing) {
+            // Merge stored props (e.g. hidden, name) into pre-seeded category objects
+            Object.assign(existing, c);
+          } else {
+            categories.push(c);
+          }
         });
       }
     }
@@ -520,7 +526,12 @@ async function initApp() {
         shortcuts = initialPayload.shortcuts || DEFAULT_SHORTCUTS.map(s => ({ ...s }));
         if (Array.isArray(initialPayload.categories)) {
           initialPayload.categories.forEach(c => {
-            if (!categories.some(exist => exist.id === c.id)) categories.push(c);
+            const existing = categories.find(exist => exist.id === c.id);
+            if (existing) {
+              Object.assign(existing, c);
+            } else {
+              categories.push(c);
+            }
           });
         }
 

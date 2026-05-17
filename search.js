@@ -68,13 +68,27 @@ const SearchEngine = {
         }
 
         if (match) {
+          // حساب ترتيب العنصر في مجلده
+          const positionInFolder = this.getItemPosition(shortcut);
+          // الحصول على اسم المجلد
+          const folderName = this.getFolderName(shortcut.categoryId);
+          // تحديد نوع القسم (أفلام/مواقع)
+          const sectionType = this.getItemSectionType(shortcut.categoryId);
+
           results.push({
             id: shortcut.id,
             name: shortcut.name,
             url: shortcut.url,
             color: shortcut.color || '#1a1a2e',
             emoji: shortcut.emoji || '🎬',
+            image: shortcut.image || null,
+            bgImage: shortcut.bgImage || null,
+            borderColor: shortcut.borderColor || 'transparent',
+            isFavorited: shortcut.isFavorited || false,
             categoryId: shortcut.categoryId,
+            folderName: folderName,
+            positionInFolder: positionInFolder,
+            sectionType: sectionType,
             matchReason: matchReason,
             type: 'shortcut'
           });
@@ -91,6 +105,49 @@ const SearchEngine = {
 
     this.results = results;
     return results;
+  },
+
+  // حساب ترتيب العنصر في مجلده
+  getItemPosition: function(shortcut) {
+    if (!shortcut || !shortcut.categoryId) return 0;
+    const catItems = shortcuts
+      .filter(s => s.categoryId === shortcut.categoryId)
+      .sort((a, b) => {
+        const aOrd = a.order ?? 0;
+        const bOrd = b.order ?? 0;
+        if (aOrd !== bOrd) return aOrd - bOrd;
+        const aTime = parseInt(a.id.split('_')[1]) || 0;
+        const bTime = parseInt(b.id.split('_')[1]) || 0;
+        return bTime - aTime;
+      });
+    return catItems.findIndex(s => s.id === shortcut.id) + 1;
+  },
+
+  // الحصول على اسم المجلد
+  getFolderName: function(categoryId) {
+    if (!categoryId) return 'غير مصنف';
+    if (typeof categories !== 'undefined' && categories) {
+      const cat = categories.find(c => c.id === categoryId);
+      if (cat) return cat.name;
+    }
+    // أسماء المجلدات الافتراضية
+    const defaultNames = {
+      'favorites_folder': 'المفضلة',
+      'favorites_folder_2': 'المفضلة 2',
+      'favorites_folder_3': 'المفضلة 3',
+      'general': 'عام'
+    };
+    return defaultNames[categoryId] || categoryId;
+  },
+
+  // تحديد نوع القسم
+  getItemSectionType: function(categoryId) {
+    if (typeof window.getCategorySection === 'function') {
+      const cat = (typeof categories !== 'undefined' && categories) ? categories.find(c => c.id === categoryId) : null;
+      if (cat) return window.getCategorySection(cat);
+    }
+    if (['favorites_folder', 'favorites_folder_2', 'favorites_folder_3'].includes(categoryId)) return 'movies';
+    return 'sites';
   },
 
   // عرض نتائج البحث
@@ -121,31 +178,57 @@ const SearchEngine = {
     this.results.forEach((result, index) => {
       const isSelected = index === this.selectedIndex;
       const selectedClass = isSelected ? 'selected' : '';
+      // بناء انماط البطاقة
+      const accentColor = result.color || '#e50914';
+      let frameStyles = '--item-color:' + accentColor + ';';
+      if (result.bgImage) {
+        frameStyles += "background-image:url('" + result.bgImage + "');background-size:cover;background-position:center;";
+      }
+      if (result.borderColor && result.borderColor !== 'transparent') {
+        const isOrange = result.borderColor === '#ffa500';
+        frameStyles += 'border-color:' + result.borderColor + ';border-width:' + (isOrange ? '5px' : '3px') + ';border-style:' + (isOrange ? 'double' : 'solid') + ';';
+      }
       
       html += `
-        <div class="search-result-card ${selectedClass}" 
-             data-index="${index}" 
-             onclick="SearchEngine.selectResult(${index})">
-          <div class="search-result-poster" style="background-color: ${result.color}">
-            ${result.emoji}
-          </div>
-          <div class="search-result-info">
-            <div class="search-result-name" title="${result.name}">
-              ${result.name}
+        <div class="search-result-card search-folder-card ${selectedClass}" 
+             data-index="${index}" data-id="${result.id}"
+             onclick="SearchEngine.selectResult(${index})"
+             oncontextmenu="SearchEngine.onContextMenu(event, ${index})">
+          <div class="search-item-number">${result.positionInFolder}</div>
+            ${result.isFavorited ? '<div class="search-item-heart">❤️</div>' : ''}
+            <div class="search-fav-rect-frame" style="${frameStyles}">'#e50914'};${result.bgImage ? "background-image:url('" + result.bgImage + "');background-size:cover;background-position:center;" : ''}${result.borderColor && result.borderColor !== 'transparent' ? 'border-color:' + result.borderColor + ';border-width:' + (result.borderColor === '#ffa500' ? '5px' : '3px') + ';border-style:' + (result.borderColor === '#ffa500' ? 'double' : 'solid') + ';' : ''}">
+              <div class="search-fav-rect-overlay"></div>
+              <span class="search-fav-rect-name">${result.name}</span>
             </div>
-            <div class="search-result-url" title="${result.url}">
-              ${this.truncateUrl(result.url)}
+            <div class="search-folder-info">
+              <span class="search-folder-badge">📁 ${result.folderName || 'غير مصنف'}</span>
+              <span class="search-position-badge">🔢 ${result.positionInFolder}</span>
             </div>
-            <div class="search-result-match-badge">
-              ${this.getMatchTypeLabel(result.matchReason)}
-            </div>
-          </div>
         </div>
       `;
     });
 
     html += `</div>`;
     container.innerHTML = html;
+  },
+
+  // قائمة الكليك يمين
+  onContextMenu: function(e, index) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (index < 0 || index >= this.results.length) return;
+    const result = this.results[index];
+    if (typeof openContextMenu === 'function') {
+      openContextMenu(e, result.id);
+    }
+  },
+
+  // HTML escape
+  escHtml: function(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
   },
 
   // تمييز النص المطابق
