@@ -2,7 +2,7 @@
   "_total_count": 87,
   "_category_id": "favorites_folder_2",
   "_category_name": "مفضلة 2",
-  "_exported": "2026-05-20T20:45:20.936Z",
+  "_exported": "2026-05-23T21:05:31.902Z",
   "items": [
     {
       "id": "site_1775411249342",
@@ -875,7 +875,8 @@
       "emoji": "U",
       "borderColor": "#ffff00",
       "order": 75,
-      "isFavorited": true
+      "isFavorited": true,
+      "favType": "RR"
     },
     {
       "id": "site_1777322084097",
@@ -912,7 +913,9 @@
       "bgImage": "https://aflam.top/wp-content/uploads/2026/04/Nightbird-2023-1.jpg",
       "emoji": "ف",
       "borderColor": "#ffffff",
-      "order": 78
+      "order": 78,
+      "isFavorited": true,
+      "favType": "R"
     },
     {
       "id": "site_1778445521742",
@@ -972,7 +975,9 @@
       "bgImage": "https://aflam.top/wp-content/uploads/2026/04/Rafureshia-1995.jpg",
       "emoji": "ف",
       "borderColor": "#ffff00",
-      "order": 83
+      "order": 83,
+      "isFavorited": true,
+      "favType": "R"
     },
     {
       "id": "site_1778617773628",
