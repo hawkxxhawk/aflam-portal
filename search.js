@@ -85,6 +85,7 @@ const SearchEngine = {
             bgImage: shortcut.bgImage || null,
             borderColor: shortcut.borderColor || 'transparent',
             isFavorited: shortcut.isFavorited || false,
+            favType: shortcut.favType || null,
             categoryId: shortcut.categoryId,
             folderName: folderName,
             positionInFolder: positionInFolder,

@@ -83,6 +83,8 @@ let _homeSection        = 'movies';           // active section tab on home dash
 let _homeDisplayFolder  = 'favorites_folder'; // folder whose items are shown on home dashboard
 let _homeSortOrder      = 'newest';           // 'newest' | 'oldest' | 'favorites' | 'custom'
 let _currentPage = 1; // Current page for pagination (folder views)
+let folderSelection = new Set();
+let _suppressNextFolderClick = false;
 let _homePage    = 1; // Current page for home dashboard
 const ITEMS_PER_PAGE      = 20; // Items per page — folder views
 const HOME_ITEMS_PER_PAGE = 50; // Items per page — home dashboard
@@ -418,43 +420,63 @@ async function exportFavoritesOnly() {
 }
 
 async function exportFavoritesCombined() {
-  const favoriteFiles = [
-    { categoryId: 'favorites_folder', filename: 'favourit.json', displayName: 'المفضلة' },
+  // ── 1. المجلدات النظامية الثابتة ─────────────────────────────────────
+  const systemFavFiles = [
+    { categoryId: 'favorites_folder',   filename: 'favourit.json',  displayName: 'المفضلة' },
     { categoryId: 'favorites_folder_2', filename: 'favourit2.json', displayName: 'مفضلة 2' },
     { categoryId: 'favorites_folder_3', filename: 'favourit3.json', displayName: 'مفضلة 3' }
   ];
 
-  // Ensure we have full data (with images) from IndexedDB if not in memory
+  // ── 2. مجلدات قسم الأفلام المضافة من قِبَل المستخدم ─────────────────
+  // helper مضمّن: يعمل قبل تعريف window.getCategorySection
+  function isMov(cat) {
+    if (typeof window.getCategorySection === 'function') return window.getCategorySection(cat) === 'movies';
+    if (cat.section) return cat.section === 'movies';
+    return ['favorites_folder', 'favorites_folder_2', 'favorites_folder_3'].includes(cat.id);
+  }
+  const systemIds = new Set(['favorites_folder', 'favorites_folder_2', 'favorites_folder_3']);
+  const extraMovieFolders = categories
+    .filter(cat => !cat.hidden && !systemIds.has(cat.id) && isMov(cat))
+    .map(cat => ({
+      categoryId: cat.id,
+      filename:   `${cat.id}.json`,   // نفس اسم الملف الذي يستخدمه loadDataFromChunks
+      displayName: cat.name
+    }));
+
+  const allFolders = [...systemFavFiles, ...extraMovieFolders];
+
+  // ── 3. الحصول على بيانات الاختصارات (IndexedDB → localStorage) ───────
   let exportShortcuts = Array.isArray(shortcuts) && shortcuts.length > 0 ? shortcuts : null;
   if (!exportShortcuts && typeof IPTV_DB !== 'undefined') {
     try {
       const dbShortcuts = await IPTV_DB.get('rm_shortcuts');
       if (Array.isArray(dbShortcuts) && dbShortcuts.length > 0) exportShortcuts = dbShortcuts;
-    } catch (e) { console.warn('Export favs: IndexedDB read failed', e); }
+    } catch (e) { console.warn('Export movies: IndexedDB read failed', e); }
   }
   if (!exportShortcuts) exportShortcuts = JSON.parse(localStorage.getItem('rm_shortcuts') || '[]');
 
+  // ── 4. بناء ملف ZIP ───────────────────────────────────────────────────
   const zip = new JSZip();
   const dbFolder = zip.folder('database_chunks');
-  let hasAnyFavorites = false;
+  let hasAnyData = false;
 
-  favoriteFiles.forEach(item => {
-    const favs = exportShortcuts
+  allFolders.forEach(item => {
+    const items = exportShortcuts
       .filter(s => s.categoryId === item.categoryId)
       .map(({ isExternalFav, ...rest }) => rest);
-    if (favs.length > 0) hasAnyFavorites = true;
-    const favPayload = {
-      _total_count: favs.length,
-      _category_id: item.categoryId,
+    if (items.length > 0) hasAnyData = true;
+    const payload = {
+      _total_count:   items.length,
+      _category_id:   item.categoryId,
       _category_name: item.displayName,
-      _exported: new Date().toISOString(),
-      items: favs
+      _exported:      new Date().toISOString(),
+      items
     };
-    dbFolder.file(item.filename, JSON.stringify(favPayload, null, 2));
+    dbFolder.file(item.filename, JSON.stringify(payload, null, 2));
   });
 
-  if (!hasAnyFavorites) {
-    showToast('⚠️ لا توجد مواقع في أي من مجلدات المفضلة للتصدير');
+  if (!hasAnyData) {
+    showToast('⚠️ لا توجد مواقع في أي من مجلدات الأفلام للتصدير');
     return;
   }
 
@@ -462,10 +484,12 @@ async function exportFavoritesCombined() {
   const url = URL.createObjectURL(content);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `favorites_export_${new Date().getTime()}.zip`;
+  a.download = `movies_folders_${new Date().getTime()}.zip`;
   a.click();
   URL.revokeObjectURL(url);
-  showToast('✅ تم تصدير جميع المفضلات في ملف ZIP واحد');
+
+  const extra = extraMovieFolders.length;
+  showToast(`✅ تم تصدير ${allFolders.length} مجلد أفلام${extra > 0 ? ` (منها ${extra} مجلد مُضاف)` : ''} في ملف ZIP`);
 }
 
 async function initApp() {
@@ -594,7 +618,7 @@ async function initApp() {
 function setupEventListeners() {
   document.addEventListener('click', (e) => {
     // Hide context menu
-    if (!e.target.closest('.icon-card') && !e.target.closest('#colorPickerModal')) closeContextMenu();
+    if (!e.target.closest('.icon-card') && !e.target.closest('#colorPickerModal') && !e.target.closest('#contextMenu')) closeContextMenu();
     // Hide settings menu
     const sm = document.getElementById('settingsMenu');
     if (sm && !sm.classList.contains('hidden') && !e.target.closest('#settingsMenu') && !e.target.closest('#settingsBtn')) {
@@ -1369,8 +1393,8 @@ function renderWelcomeGrid() {
     // Reset grid layout override for regular item viewing
     grid.style.display = '';
 
-    // Inside a specific category
-    let filtered = shortcuts.filter(s => s.categoryId === _currentCategory);
+    // Inside a specific category — exclude hidden items
+    let filtered = shortcuts.filter(s => s.categoryId === _currentCategory && !s.isHidden);
 
     // Sort items according to the current sort mode
     filtered.sort((a, b) => {
@@ -1449,7 +1473,7 @@ function renderWelcomeGrid() {
         }
         item.innerHTML = `
           <div class="item-number">${globalIndex}</div>
-          ${s.isFavorited ? '<div class="item-heart">❤️</div>' : ''}
+          ${getFavHeartHtml(s)}
           <div class="fav-rect-frame" style="--item-color:${accentColor};${bgImageStyle}${borderColor}">
             <div class="fav-rect-overlay"></div>
             <span class="fav-rect-name">${escHtml(s.name)}</span>
@@ -1459,10 +1483,14 @@ function renderWelcomeGrid() {
         // App shortcut style for Site locations
         item.innerHTML = `
           <div class="item-number">${globalIndex}</div>
-          ${s.isFavorited ? '<div class="item-heart">❤️</div>' : ''}
+          ${getFavHeartHtml(s)}
           ${buildIconImg(s, 72)}
           <span>${escHtml(s.name)}</span>
         `;
+      }
+
+      if (folderSelection.has(s.id)) {
+        item.classList.add('selected');
       }
 
       // Add event listeners immediately for better performance
@@ -1470,7 +1498,8 @@ function renderWelcomeGrid() {
       item.addEventListener('dragend', handleItemDragEnd);
       item.addEventListener('dragover', handleItemDragOver);
       item.addEventListener('drop', handleItemDrop);
-      item.addEventListener('click', () => openSite(s));
+      item.addEventListener('pointerdown', e => handleFolderItemPointerDown(e, s));
+      item.addEventListener('click', e => handleFolderItemClick(e, s));
       item.addEventListener('contextmenu', e => openContextMenu(e, s.id));
 
       fragment.appendChild(item);
@@ -1492,6 +1521,129 @@ function renderWelcomeGrid() {
       grid.appendChild(emptyMsg);
     }
   }
+
+  updateFolderSelectionBar();
+}
+
+function handleFolderItemClick(e, s) {
+  if (_suppressNextFolderClick) {
+    _suppressNextFolderClick = false;
+    return;
+  }
+
+  if (_currentCategory === 'all') {
+    openSite(s);
+    return;
+  }
+
+  if ((e.ctrlKey || e.metaKey) && e.button === 0) {
+    e.preventDefault();
+    e.stopPropagation();
+    toggleFolderItemSelection(s.id);
+    return;
+  }
+
+  if (folderSelection.size > 0) {
+    clearFolderSelection();
+  }
+
+  openSite(s);
+}
+
+function handleFolderItemPointerDown(e, s) {
+  if (_currentCategory === 'all') return;
+  if ((e.ctrlKey || e.metaKey) && e.button === 0) {
+    e.preventDefault();
+    e.stopPropagation();
+    toggleFolderItemSelection(s.id);
+    _suppressNextFolderClick = true;
+  }
+}
+
+function toggleFolderItemSelection(id) {
+  if (folderSelection.has(id)) {
+    folderSelection.delete(id);
+  } else {
+    folderSelection.add(id);
+  }
+  renderWelcomeGrid();
+  updateFolderSelectionBar();
+}
+
+function clearFolderSelection() {
+  if (folderSelection.size === 0) return;
+  folderSelection.clear();
+  renderWelcomeGrid();
+  updateFolderSelectionBar();
+}
+
+function updateFolderSelectionBar() {
+  const bar = document.getElementById('selectionBar');
+  const count = document.getElementById('batchSelectionCount');
+  if (!bar || !count) return;
+
+  const show = _currentCategory !== 'all' && folderSelection.size > 0;
+  bar.classList.toggle('hidden', !show);
+  if (!show) return;
+
+  count.textContent = `تم تحديد ${folderSelection.size} عنصر`;
+}
+
+function batchDeleteSelected() {
+  if (folderSelection.size === 0) return;
+  const ids = [...folderSelection];
+  const confirmation = confirm(`هل تريد حذف ${ids.length} عنصر محدد؟`);
+  if (!confirmation) return;
+
+  shortcuts = shortcuts.filter(s => !folderSelection.has(s.id));
+  saveShortcuts();
+  clearFolderSelection();
+  renderWelcomeGrid();
+  updateSortOrderButton();
+  showToast(`✅ تم حذف ${ids.length} عنصر`);
+}
+
+function batchHideSelected() {
+  if (folderSelection.size === 0) return;
+  const count = folderSelection.size;
+  shortcuts.forEach(s => {
+    if (folderSelection.has(s.id)) s.isHidden = true;
+  });
+  saveShortcuts();
+  clearFolderSelection();
+  renderWelcomeGrid();
+  updateSortOrderButton();
+  showToast(`✅ تم إخفاء ${count} عنصر`);
+}
+
+function batchMoveSelected() {
+  if (folderSelection.size === 0) return;
+  const availableCats = categories.filter(c => c.id !== _currentCategory && !c.hidden);
+  if (availableCats.length === 0) {
+    showToast('⚠️ لا يوجد مجلد آخر لنقل العناصر إليه');
+    return;
+  }
+
+  const choices = availableCats.map((c, index) => `${index + 1}. ${c.displayName || c.name}`).join('\n');
+  const answer = prompt(`اختر المجلد الجديد لنقل العناصر:\n${choices}`, '1');
+  if (answer === null) return;
+
+  const selectedIndex = parseInt(answer, 10) - 1;
+  if (isNaN(selectedIndex) || selectedIndex < 0 || selectedIndex >= availableCats.length) {
+    showToast('❌ رقم مجلد غير صالح');
+    return;
+  }
+
+  const targetCat = availableCats[selectedIndex];
+  const movedCount = folderSelection.size;
+  shortcuts.forEach(s => {
+    if (folderSelection.has(s.id)) s.categoryId = targetCat.id;
+  });
+  saveShortcuts();
+  clearFolderSelection();
+  renderWelcomeGrid();
+  updateSortOrderButton();
+  showToast(`✅ تم نقل ${movedCount} عنصر إلى ${targetCat.displayName || targetCat.name}`);
 }
 
 // ── Home Dashboard ────────────────────────────────────────────────────
@@ -1535,7 +1687,8 @@ function renderHomeDashboard(grid) {
       const chip = document.createElement('button');
       chip.className = 'home-folder-chip' + (_homeDisplayFolder === cat.id ? ' active' : '');
       const catCount = shortcuts.filter(s => s.categoryId === cat.id).length;
-      chip.innerHTML = `${escHtml(cat.name)} <span class="chip-count">${catCount}</span>`;
+      const catDisplayName = (cat.section === 'movies' || ['favorites_folder', 'favorites_folder_2', 'favorites_folder_3'].includes(cat.id)) ? (cat.displayName || cat.name) : cat.name;
+      chip.innerHTML = `${escHtml(catDisplayName)} <span class="chip-count">${catCount}</span>`;
       chip.onclick = () => selectHomeFolder(cat.id);
       foldersRow.appendChild(chip);
     });
@@ -1568,7 +1721,7 @@ function renderHomeDashboard(grid) {
   const isFav = ['favorites_folder', 'favorites_folder_2', 'favorites_folder_3'].includes(_homeDisplayFolder);
 
   const allItems = shortcuts
-    .filter(s => s.categoryId === _homeDisplayFolder)
+    .filter(s => s.categoryId === _homeDisplayFolder && !s.isHidden)
     .sort((a, b) => {
       // ── المفضلة أولاً ──
       if (_homeSortOrder === 'favorites') {
@@ -1623,7 +1776,7 @@ function renderHomeDashboard(grid) {
           : '';
         item.innerHTML = `
           <div class="item-number">${globalIdx}</div>
-          ${s.isFavorited ? '<div class="item-heart">❤️</div>' : ''}
+          ${getFavHeartHtml(s)}
           <div class="fav-rect-frame" style="--item-color:${ac};${bg}${bc}">
             <div class="fav-rect-overlay"></div>
             <span class="fav-rect-name">${escHtml(s.name)}</span>
@@ -1631,7 +1784,7 @@ function renderHomeDashboard(grid) {
       } else {
         item.innerHTML = `
           <div class="item-number">${globalIdx}</div>
-          ${s.isFavorited ? '<div class="item-heart">❤️</div>' : ''}
+          ${getFavHeartHtml(s)}
           ${buildIconImg(s, 72)}
           <span>${escHtml(s.name)}</span>`;
       }
@@ -2154,7 +2307,12 @@ function updateSortOrderButton() {
   if (inFolder) {
     if (barTitle) {
       const cat = categories.find(c => c.id === _currentCategory);
-      barTitle.textContent = cat ? cat.name : _currentCategory;
+      if (cat) {
+        const isMoviesSection = (cat.section === 'movies' || ['favorites_folder', 'favorites_folder_2', 'favorites_folder_3'].includes(cat.id));
+        barTitle.textContent = isMoviesSection ? (cat.displayName || cat.name) : cat.name;
+      } else {
+        barTitle.textContent = _currentCategory;
+      }
     }
     if (barCount) {
       const count = shortcuts.filter(s => s.categoryId === _currentCategory).length;
@@ -2212,11 +2370,19 @@ function openContextMenu(e, id) {
   e.stopPropagation();
   ctxTargetId = id;
 
-  // Update heart button label to reflect current favorite state
+  // Update button labels to reflect current state
   const s = shortcuts.find(x => x.id === id);
   const heartBtn = document.getElementById('ctxFavoriteBtn');
   if (heartBtn && s) {
-    heartBtn.textContent = s.isFavorited ? '💔 إلغاء التفضيل' : '❤️ تفضيل';
+    const favIcon = s.isFavorited ? (FAV_ICONS[s.favType] || '❤️') : '❤️';
+    heartBtn.innerHTML = `${favIcon} تفضيل ▸`;
+  }
+  // إخفاء القائمة الفرعية
+  const favSubMenu = document.getElementById('favSubMenu');
+  if (favSubMenu) favSubMenu.classList.add('hidden');
+  const hideBtn = document.getElementById('ctxHideBtn');
+  if (hideBtn && s) {
+    hideBtn.textContent = s.isHidden ? '👁️ إظهار' : '🙈 إخفاء';
   }
 
   const menu = document.getElementById('contextMenu');
@@ -2235,6 +2401,9 @@ function closeContextMenu() {
     menu.classList.add('hidden');
     ctxTargetId = null;
   }
+  // إخفاء القائمة الفرعية للتفضيل
+  const favSubMenu = document.getElementById('favSubMenu');
+  if (favSubMenu) favSubMenu.classList.add('hidden');
 }
 function ctxEdit() {
   if (!ctxTargetId) return;
@@ -2305,16 +2474,86 @@ function ctxChangeOrder() {
   closeContextMenu();
 }
 
+// خريطة رموز التفضيل
+const FAV_ICONS = {
+  'red-heart': '❤️',
+  'green-heart': '💚',
+  'yellow-heart': '💛',
+  'R': 'R',
+  'RR': 'RR',
+  'S': 'S'
+};
+
+// الحصول على HTML لرمز التفضيل
+function getFavHeartHtml(shortcut) {
+  if (!shortcut.isFavorited) return '';
+  const favType = shortcut.favType || 'red-heart';
+  const icon = FAV_ICONS[favType] || '❤️';
+  return `<div class="item-heart" data-fav="${favType}">${icon}</div>`;
+}
+
+// تبديل عرض القائمة الفرعية للتفضيل
+function toggleFavSubMenu() {
+  const sub = document.getElementById('favSubMenu');
+  if (!sub) return;
+  sub.classList.toggle('hidden');
+}
+
+// تعيين نوع التفضيل
+function ctxSetFavorite(favType) {
+  if (!ctxTargetId) return;
+  const s = shortcuts.find(x => x.id === ctxTargetId);
+  if (!s) return;
+
+  if (favType === null) {
+    // إزالة التفضيل
+    s.isFavorited = false;
+    s.favType = null;
+    showToast(`🤍 تم إلغاء تفضيل "${s.name}"`);
+  } else {
+    s.isFavorited = true;
+    s.favType = favType;
+    const icon = FAV_ICONS[favType] || '❤️';
+    showToast(`${icon} تم تفضيل "${s.name}"`);
+  }
+
+  saveShortcuts();
+  renderIcons();
+  renderWelcomeGrid();
+  updateSortOrderButton();
+  closeContextMenu();
+}
+
+// دالة التفضيل القديمة - محفوظة للتوافق
 function ctxToggleFavorite() {
   if (!ctxTargetId) return;
   const s = shortcuts.find(x => x.id === ctxTargetId);
   if (!s) return;
-  s.isFavorited = !s.isFavorited;
+  if (s.isFavorited) {
+    s.isFavorited = false;
+    s.favType = null;
+    showToast(`🤍 تم إلغاء تفضيل "${s.name}"`);
+  } else {
+    s.isFavorited = true;
+    s.favType = s.favType || 'red-heart';
+    showToast(`❤️ تم تفضيل "${s.name}"`);
+  }
   saveShortcuts();
   renderIcons();
   renderWelcomeGrid();
-  updateSortOrderButton(); // تحديث عداد العناصر عند تغيير حالة المفضلة
-  showToast(s.isFavorited ? `❤️ تم تفضيل "${s.name}"` : `🤍 تم إلغاء تفضيل "${s.name}"`);
+  updateSortOrderButton();
+  closeContextMenu();
+}
+
+function ctxToggleHide() {
+  if (!ctxTargetId) return;
+  const s = shortcuts.find(x => x.id === ctxTargetId);
+  if (!s) return;
+  s.isHidden = !s.isHidden;
+  saveShortcuts();
+  renderIcons();
+  renderWelcomeGrid();
+  showToast(s.isHidden ? `🙈 تم إخفاء "${s.name}"` : `👁️ تم إظهار "${s.name}"`);
   closeContextMenu();
 }
 
@@ -2496,6 +2735,11 @@ function openAddModal() {
   document.getElementById('siteColor').value = '#1a1a2e';
   document.getElementById('colorPreviewText').textContent = '#1a1a2e';
   document.getElementById('siteBgImage').value = '';
+  // Hide toggle — always unchecked for new items; hide the row label since it's only for editing
+  const hiddenChk = document.getElementById('siteHidden');
+  if (hiddenChk) hiddenChk.checked = false;
+  const hideRow = document.getElementById('hideToggleRow');
+  if (hideRow) hideRow.style.display = 'none';
 
   // Auto-select current category (if not in 'all' view)
   const categorySelect = document.getElementById('siteCategory');
@@ -2529,6 +2773,11 @@ function openEditModal(s) {
   document.getElementById('colorPreviewText').textContent = s.color || '#1a1a2e';
   document.getElementById('siteCategory').value = s.categoryId || 'general';
   document.getElementById('siteBgImage').value = s.bgImage || '';
+  // Show hide toggle in edit mode, set its state
+  const hiddenChk = document.getElementById('siteHidden');
+  if (hiddenChk) hiddenChk.checked = !!s.isHidden;
+  const hideRow = document.getElementById('hideToggleRow');
+  if (hideRow) hideRow.style.display = '';
 
   if (s.image) {
     const preview = document.getElementById('iconPreview');
@@ -2579,6 +2828,7 @@ function saveShortcut() {
   const color = document.getElementById('siteColor').value;
   const categoryId = document.getElementById('siteCategory').value || 'general';
   const bgImage = document.getElementById('siteBgImage').value.trim();
+  const isHidden = !!(document.getElementById('siteHidden') && document.getElementById('siteHidden').checked);
 
   if (!name) { flashInput('siteName'); return; }
   if (!url) { flashInput('siteUrl'); return; }
@@ -2599,7 +2849,8 @@ function saveShortcut() {
         categoryId,
         image: currentIconImage,
         bgImage: bgImage || null,
-        emoji: shortcuts[idx].emoji || name.charAt(0).toUpperCase()
+        emoji: shortcuts[idx].emoji || name.charAt(0).toUpperCase(),
+        isHidden: isHidden || false
       };
       if (oldCategory !== categoryId) {
         ensureShortcutOrders();
@@ -2697,14 +2948,16 @@ function renderCategorySelector() {
       html += `<hr class="dropdown-divider"/><div class="dropdown-section-label">🌐 قسم المواقع</div>`;
       sitesCats.forEach(c => {
         const cnt = shortcuts.filter(s => s.categoryId === c.id).length;
-        html += `<button onclick="selectCategory('${c.id}')">📁 ${escHtml(c.name)} <span class="cat-item-count">${cnt}</span></button>`;
+        const label = c.displayName || c.name;
+        html += `<button onclick="selectCategory('${c.id}')">📁 ${escHtml(label)} <span class="cat-item-count">${cnt}</span></button>`;
       });
     }
     if (moviesCats.length) {
       html += `<hr class="dropdown-divider"/><div class="dropdown-section-label">🎬 قسم الأفلام</div>`;
       moviesCats.forEach(c => {
         const cnt = shortcuts.filter(s => s.categoryId === c.id).length;
-        html += `<button onclick="selectCategory('${c.id}')">📁 ${escHtml(c.name)} <span class="cat-item-count">${cnt}</span></button>`;
+        const label = c.displayName || c.name;
+        html += `<button onclick="selectCategory('${c.id}')">📁 ${escHtml(label)} <span class="cat-item-count">${cnt}</span></button>`;
       });
     }
     menu.innerHTML = html;
@@ -2718,12 +2971,18 @@ function renderCategorySelector() {
     let html = '';
     if (sitesCats.length) {
       html += `<optgroup label="🌐 قسم المواقع">`;
-      sitesCats.forEach(c => { html += `<option value="${c.id}">${escHtml(c.name)}${c.hidden ? ' (مخفي)' : ''}</option>`; });
+      sitesCats.forEach(c => {
+        const label = c.displayName || c.name;
+        html += `<option value="${c.id}">${escHtml(label)}${c.hidden ? ' (مخفي)' : ''}</option>`;
+      });
       html += `</optgroup>`;
     }
     if (moviesCats.length) {
       html += `<optgroup label="🎬 قسم الأفلام">`;
-      moviesCats.forEach(c => { html += `<option value="${c.id}">${escHtml(c.name)}${c.hidden ? ' (مخفي)' : ''}</option>`; });
+      moviesCats.forEach(c => {
+        const label = c.displayName || c.name;
+        html += `<option value="${c.id}">${escHtml(label)}${c.hidden ? ' (مخفي)' : ''}</option>`;
+      });
       html += `</optgroup>`;
     }
     selectCombo.innerHTML = html;
@@ -2743,7 +3002,9 @@ function selectCategory(id) {
     _navigationStack.push(id);
   }
 
-  const label = id === 'all' ? 'كل المواقع' : (categories.find(c => c.id === id)?.name || 'كل المواقع');
+  const cat = id === 'all' ? null : categories.find(c => c.id === id);
+  const isMoviesCat = cat && (cat.section === 'movies' || ['favorites_folder', 'favorites_folder_2', 'favorites_folder_3'].includes(cat.id));
+  const label = id === 'all' ? 'كل المواقع' : (isMoviesCat ? (cat.displayName || cat.name) : (cat?.name || 'كل المواقع'));
   const itemCount = id === 'all' ? shortcuts.length : shortcuts.filter(s => s.categoryId === id).length;
   document.getElementById('currentCategoryLabel').innerHTML = `${escHtml(label)} <span class="cat-item-count">${itemCount}</span>`;
 
@@ -2811,7 +3072,9 @@ function goBackView() {
     const prev = _navigationStack[_navigationStack.length - 1];
     _currentCategory = prev;
 
-    const label = _currentCategory === 'all' ? 'كل المواقع' : (categories.find(c => c.id === _currentCategory)?.name || 'كل المواقع');
+    const backCat = _currentCategory === 'all' ? null : categories.find(c => c.id === _currentCategory);
+    const isBackMoviesCat = backCat && (backCat.section === 'movies' || ['favorites_folder', 'favorites_folder_2', 'favorites_folder_3'].includes(backCat.id));
+    const label = _currentCategory === 'all' ? 'كل المواقع' : (isBackMoviesCat ? (backCat.displayName || backCat.name) : (backCat?.name || 'كل المواقع'));
     const itemCount = _currentCategory === 'all' ? shortcuts.length : shortcuts.filter(s => s.categoryId === _currentCategory).length;
     document.getElementById('currentCategoryLabel').innerHTML = `${escHtml(label)} <span class="cat-item-count">${itemCount}</span>`;
 
@@ -2855,14 +3118,17 @@ function renderManageCategoriesList() {
     groupCats.forEach((c, _i) => {
       const index = categories.indexOf(c);
       const isSystem = ['general', 'favorites_folder', 'favorites_folder_2', 'favorites_folder_3'].includes(c.id);
+      const isMoviesSection = sectionId === 'movies';
+      const hasDisplayName = c.displayName && c.displayName !== c.name;
       const li = document.createElement('li');
       li.innerHTML = `
-        <span class="category-name-display">${escHtml(c.name)} ${c.hidden ? '<small style="opacity:0.5">(مخفي)</small>' : ''} ${isSystem ? '<small style="opacity:0.5">(أساسي)</small>' : ''}</span>
+        <span class="category-name-display">${escHtml(c.name)} ${hasDisplayName ? `<small style="color:#4fc3f7;font-weight:600">⇢ ${escHtml(c.displayName)}</small>` : ''} ${c.hidden ? '<small style="opacity:0.5">(مخفي)</small>' : ''} ${isSystem ? '<small style="opacity:0.5">(أساسي)</small>' : ''}</span>
         <div class="cat-actions" style="display:flex;gap:4px;align-items:center;">
           <button class="cat-btn" onclick="moveCategory('${c.id}', -1)" title="لأعلى" style="font-size:10px;padding:2px 6px;${index === 0 || isSystem ? 'opacity:0.3;cursor:not-allowed;' : ''}" ${index === 0 || isSystem ? 'disabled' : ''}> ▲ </button>
           <button class="cat-btn" onclick="moveCategory('${c.id}', 1)"  title="لأسفل" style="font-size:10px;padding:2px 6px;${index === categories.length - 1 || isSystem ? 'opacity:0.3;cursor:not-allowed;' : ''}" ${index === categories.length - 1 || isSystem ? 'disabled' : ''}> ▼ </button>
           <div style="width:1px;height:16px;background:var(--glass-border);margin:0 2px;"></div>
           <button class="cat-btn" onclick="toggleCategoryVisibility('${c.id}')" title="${c.hidden ? 'إظهار' : 'إخفاء'}" style="font-size:10px;padding:2px 6px;">${c.hidden ? '👁️ إظهار' : '🙈 إخفاء'}</button>
+          ${isMoviesSection ? `<button class="cat-btn" onclick="renameCategoryDisplayName('${c.id}')" title="تغيير الاسم الظاهر في الصفحة الرئيسية" style="font-size:10px;padding:2px 6px;${hasDisplayName ? 'color:#4fc3f7;' : ''}">🏷️</button>` : ''}
           ${!isSystem ? `<button class="cat-btn" onclick="renameCategory('${c.id}')" title="تعديل الاسم">✏️</button>` : ''}
           ${!isSystem ? `<button class="cat-btn delete" onclick="deleteCategory('${c.id}')" title="حذف">🗑️</button>` : ''}
         </div>
@@ -2920,6 +3186,41 @@ function renameCategory(id) {
 
   if (!document.getElementById('manageSitesModal').classList.contains('hidden')) {
     renderManageSitesList();
+  }
+}
+
+function renameCategoryDisplayName(id) {
+  const cat = categories.find(c => c.id === id);
+  if (!cat) return;
+  const currentDisplay = cat.displayName || cat.name;
+  const newDisplayName = prompt('تغيير الاسم الظاهر في الصفحة الرئيسية:\n(الاسم الأساسي سيبقى كما هو في باقي إعدادات التطبيق)', currentDisplay);
+  if (newDisplayName === null) return; // cancelled
+  const trimmed = newDisplayName.trim();
+
+  // If empty or same as original name, remove displayName
+  if (!trimmed || trimmed === cat.name) {
+    delete cat.displayName;
+    showToast('✅ تم إعادة الاسم الظاهر للاسم الأساسي');
+  } else if (trimmed !== currentDisplay) {
+    cat.displayName = trimmed;
+    showToast('✅ تم تغيير الاسم الظاهر بنجاح');
+  } else {
+    return; // no change
+  }
+
+  saveShortcuts();
+  renderManageCategoriesList();
+  renderWelcomeGrid();
+  updateSortOrderButton();
+
+  // Update current category label if viewing this folder
+  if (_currentCategory === id) {
+    const isMoviesCat = cat.section === 'movies' || ['favorites_folder', 'favorites_folder_2', 'favorites_folder_3'].includes(cat.id);
+    const label = isMoviesCat ? (cat.displayName || cat.name) : cat.name;
+    const itemCount = shortcuts.filter(s => s.categoryId === id).length;
+    document.getElementById('currentCategoryLabel').innerHTML = `${escHtml(label)} <span class="cat-item-count">${itemCount}</span>`;
+    const categoryTitle = document.getElementById('categoryTitle');
+    if (categoryTitle) categoryTitle.textContent = `${label} (${itemCount})`;
   }
 }
 
@@ -3113,6 +3414,107 @@ function deleteCategory(id) {
   renderManageCategoriesList();
   renderIcons();
   renderWelcomeGrid();
+}
+
+// ── Modals: Manage Items (hidden items management) ────────────────────
+let _manageItemsTab = 'hidden'; // 'hidden' | 'all'
+
+function openManageItemsModal() {
+  document.getElementById('settingsMenu').classList.add('hidden');
+  _manageItemsTab = 'hidden';
+  // Populate category filter
+  const catFilter = document.getElementById('manageItemsCatFilter');
+  if (catFilter) {
+    catFilter.innerHTML = '<option value="">كل المجلدات</option>';
+    categories.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.id;
+      opt.textContent = c.name;
+      catFilter.appendChild(opt);
+    });
+  }
+  // Reset search
+  const search = document.getElementById('manageItemsSearch');
+  if (search) search.value = '';
+  document.getElementById('manageItemsModal').classList.remove('hidden');
+  renderManageItemsList();
+}
+
+function closeManageItemsModal() {
+  document.getElementById('manageItemsModal').classList.add('hidden');
+}
+
+function switchManageItemsTab(tab) {
+  _manageItemsTab = tab;
+  document.querySelectorAll('.manage-items-tab').forEach(btn => btn.classList.remove('active'));
+  const activeTab = document.getElementById(tab === 'hidden' ? 'tabHiddenItems' : 'tabAllItems');
+  if (activeTab) activeTab.classList.add('active');
+  renderManageItemsList();
+}
+
+function renderManageItemsList() {
+  const list = document.getElementById('manageItemsList');
+  if (!list) return;
+
+  const searchVal = (document.getElementById('manageItemsSearch')?.value || '').trim().toLowerCase();
+  const catFilterVal = document.getElementById('manageItemsCatFilter')?.value || '';
+
+  let items = _manageItemsTab === 'hidden'
+    ? shortcuts.filter(s => s.isHidden)
+    : shortcuts;
+
+  if (catFilterVal) items = items.filter(s => s.categoryId === catFilterVal);
+  if (searchVal)    items = items.filter(s => s.name.toLowerCase().includes(searchVal));
+
+  list.innerHTML = '';
+
+  if (items.length === 0) {
+    const li = document.createElement('li');
+    li.style.cssText = 'justify-content:center;color:var(--text-muted);padding:20px;';
+    li.textContent = _manageItemsTab === 'hidden' ? 'لا توجد عناصر مخفية.' : 'لا توجد عناصر.';
+    list.appendChild(li);
+    return;
+  }
+
+  items.forEach(s => {
+    const cat = categories.find(c => c.id === s.categoryId);
+    const catName = cat ? cat.name : s.categoryId;
+    const li = document.createElement('li');
+    li.style.cssText = 'flex-wrap:nowrap;gap:8px;align-items:center;';
+    li.innerHTML = `
+      <div style="flex:1;display:flex;align-items:center;gap:8px;overflow:hidden;">
+        ${buildIconImg(s, 32)}
+        <div style="overflow:hidden;">
+          <div style="font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(s.name)}</div>
+          <div style="font-size:11px;color:var(--text-muted);">📁 ${escHtml(catName)}${s.isHidden ? ' · <span style="color:#e50914">مخفي</span>' : ''}</div>
+        </div>
+      </div>
+      <div style="flex-shrink:0;display:flex;gap:4px;">
+        ${s.isHidden
+          ? `<button class="cat-btn" onclick="toggleItemHidden('${s.id}')" style="font-size:11px;padding:3px 8px;">👁️ إظهار</button>`
+          : `<button class="cat-btn" onclick="toggleItemHidden('${s.id}')" style="font-size:11px;padding:3px 8px;opacity:.6;">🙈 إخفاء</button>`}
+        <button class="cat-btn edit" onclick="editSiteFromItems('${s.id}')" style="font-size:11px;padding:3px 8px;">✏️</button>
+      </div>`;
+    list.appendChild(li);
+  });
+}
+
+function toggleItemHidden(id) {
+  const s = shortcuts.find(x => x.id === id);
+  if (!s) return;
+  s.isHidden = !s.isHidden;
+  saveShortcuts();
+  renderManageItemsList();
+  renderIcons();
+  renderWelcomeGrid();
+  showToast(s.isHidden ? `🙈 تم إخفاء "${s.name}"` : `👁️ تم إظهار "${s.name}"`);
+}
+
+function editSiteFromItems(id) {
+  const s = shortcuts.find(x => x.id === id);
+  if (!s) return;
+  closeManageItemsModal();
+  openEditModal(s);
 }
 
 // ── Modals: Manage Sites ──────────────────────────────────────────────
