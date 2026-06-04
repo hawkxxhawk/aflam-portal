@@ -1,8 +1,8 @@
 {
-  "_total_count": 17,
+  "_total_count": 20,
   "_category_id": "RATED MOVIES",
-  "_category_name": "XX RATED",
-  "_exported": "2026-05-20T20:45:20.990Z",
+  "_category_name": "Rated Movies",
+  "_exported": "2026-06-04T20:53:24.551Z",
   "items": [
     {
       "id": "site_1777316138032",
@@ -203,6 +203,48 @@
       "emoji": "V",
       "borderColor": "#ffffff",
       "order": 15
+    },
+    {
+      "id": "site_1780604153028",
+      "name": "aflamicose.com -cineflex",
+      "url": "https://movie.aflamicose.com/genre/%d8%a7%d9%81%d9%84%d8%a7%d9%85-%d9%84%d9%84%d9%83%d8%a8%d8%a7%d8%b1/",
+      "color": "#fd0808",
+      "categoryId": "RATED MOVIES",
+      "image": null,
+      "bgImage": null,
+      "emoji": "M",
+      "borderColor": "#ffa500",
+      "order": 17,
+      "isFavorited": true,
+      "favType": "RR",
+      "isHidden": false
+    },
+    {
+      "id": "site_1780604407237",
+      "name": "aflam18.media/افلام اسيويه",
+      "url": "https://aflam18.media/category/%d8%a7%d9%81%d9%84%d8%a7%d9%85-%d8%a7%d8%b3%d9%8a%d9%88%d9%8a%d8%a9-%d9%84%d9%84%d9%83%d8%a8%d8%a7%d8%b1-%d9%81%d9%82%d8%b7/",
+      "color": "#f70808",
+      "categoryId": "RATED MOVIES",
+      "image": null,
+      "bgImage": null,
+      "emoji": "A",
+      "borderColor": "#ffffff",
+      "order": 18,
+      "isFavorited": true,
+      "favType": "RR",
+      "isHidden": false
+    },
+    {
+      "id": "site_1780606210221",
+      "name": "movizhome",
+      "url": "https://movizhome.click/tag/%d8%a7%d9%81%d9%84%d8%a7%d9%85-%d9%84%d9%84%d9%83%d8%a8%d8%a7%d8%b1-%d9%81%d9%82%d8%b7-r/",
+      "color": "#1a1a2e",
+      "categoryId": "RATED MOVIES",
+      "image": null,
+      "bgImage": null,
+      "emoji": "M",
+      "borderColor": "#ffffff",
+      "order": 19
     }
   ]
 }

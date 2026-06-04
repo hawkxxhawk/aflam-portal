@@ -1,24 +1,30 @@
-[
-  {
-    "id": "site_1775423449205",
-    "name": "Cimanow.cc",
-    "url": "https://cimanow.cc/category/%D9%85%D8%B3%D9%84%D8%B3%D9%84%D8%A7%D8%AA-%D8%B9%D8%B1%D8%A8%D9%8A%D8%A9/",
-    "color": "#bf1d75",
-    "categoryId": "series",
-    "image": null,
-    "bgImage": null,
-    "emoji": "C",
-    "order": 0
-  },
-  {
-    "id": "site_1776885014465",
-    "name": "Egbest.net",
-    "url": "https://egbest.net/category/%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8%aa-%d8%b9%d8%b1%d8%a8%d9%8a/",
-    "color": "#459c6d",
-    "categoryId": "series",
-    "image": null,
-    "bgImage": null,
-    "emoji": "E",
-    "order": 1
-  }
-]
+{
+  "_total_count": 2,
+  "_category_id": "series",
+  "_category_name": "مسلسلات",
+  "_exported": "2026-06-04T20:53:24.551Z",
+  "items": [
+    {
+      "id": "site_1775423449205",
+      "name": "Cimanow.cc",
+      "url": "https://cimanow.cc/category/%D9%85%D8%B3%D9%84%D8%B3%D9%84%D8%A7%D8%AA-%D8%B9%D8%B1%D8%A8%D9%8A%D8%A9/",
+      "color": "#bf1d75",
+      "categoryId": "series",
+      "image": null,
+      "bgImage": null,
+      "emoji": "C",
+      "order": 0
+    },
+    {
+      "id": "site_1776885014465",
+      "name": "Egbest.net",
+      "url": "https://egbest.net/category/%d9%85%d8%b3%d9%84%d8%b3%d9%84%d8%a7%d8%aa-%d8%b9%d8%b1%d8%a8%d9%8a/",
+      "color": "#459c6d",
+      "categoryId": "series",
+      "image": null,
+      "bgImage": null,
+      "emoji": "E",
+      "order": 1
+    }
+  ]
+}

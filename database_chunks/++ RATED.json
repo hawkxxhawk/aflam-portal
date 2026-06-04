@@ -1,58 +1,100 @@
-[
-  {
-    "id": "site_1774993008362",
-    "name": "filmleek.com",
-    "url": "https://filmleek.com/genre/%D8%A7%D9%81%D9%84%D8%A7%D9%85-%D9%84%D9%84%D9%83%D8%A8%D8%A7%D8%B1",
-    "color": "#0fea0b",
-    "categoryId": "++ RATED",
-    "image": null,
-    "emoji": "F",
-    "openMode": "iframe",
-    "bgImage": null,
-    "order": 0
-  },
-  {
-    "id": "site_1774993506656",
-    "name": "sexaflam.com",
-    "url": "https://sexaflam.com/movies/",
-    "color": "#1a1a2e",
-    "categoryId": "++ RATED",
-    "image": null,
-    "emoji": "S",
-    "bgImage": null,
-    "order": 1
-  },
-  {
-    "id": "site_1776628144681",
-    "name": "Xxxshame.com",
-    "url": "https://xxxshame.com/ar/categories",
-    "color": "#974bfe",
-    "categoryId": "++ RATED",
-    "image": null,
-    "bgImage": null,
-    "emoji": "X",
-    "order": 2
-  },
-  {
-    "id": "site_1776720276119",
-    "name": "Sexmotarjam.com",
-    "url": "https://sexmotarjam.com/",
-    "color": "#65a248",
-    "categoryId": "++ RATED",
-    "image": null,
-    "bgImage": null,
-    "emoji": "S",
-    "order": 3
-  },
-  {
-    "id": "site_1776720306659",
-    "name": "Sexmotarjam.com",
-    "url": "https://sexmotarjam.com/category/%d9%85%d8%aa%d8%b1%d8%ac%d9%85/%d8%a7%d8%ba%d8%aa%d8%b5%d8%a7%d8%a8/",
-    "color": "#e44097",
-    "categoryId": "++ RATED",
-    "image": null,
-    "bgImage": null,
-    "emoji": "S",
-    "order": 4
-  }
-]
+{
+  "_total_count": 8,
+  "_category_id": "++ RATED",
+  "_category_name": "RATED ++",
+  "_exported": "2026-06-04T20:53:24.551Z",
+  "items": [
+    {
+      "id": "site_1774993008362",
+      "name": "filmleek.com",
+      "url": "https://filmleek.com/genre/%D8%A7%D9%81%D9%84%D8%A7%D9%85-%D9%84%D9%84%D9%83%D8%A8%D8%A7%D8%B1",
+      "color": "#0fea0b",
+      "categoryId": "++ RATED",
+      "image": null,
+      "emoji": "F",
+      "openMode": "iframe",
+      "bgImage": null,
+      "order": 0
+    },
+    {
+      "id": "site_1774993506656",
+      "name": "sexaflam.com",
+      "url": "https://sexaflam.com/movies/",
+      "color": "#1a1a2e",
+      "categoryId": "++ RATED",
+      "image": null,
+      "emoji": "S",
+      "bgImage": null,
+      "order": 1
+    },
+    {
+      "id": "site_1776628144681",
+      "name": "Xxxshame.com",
+      "url": "https://xxxshame.com/ar/categories",
+      "color": "#974bfe",
+      "categoryId": "++ RATED",
+      "image": null,
+      "bgImage": null,
+      "emoji": "X",
+      "order": 2
+    },
+    {
+      "id": "site_1776720276119",
+      "name": "Sexmotarjam.com",
+      "url": "https://sexmotarjam.com/",
+      "color": "#65a248",
+      "categoryId": "++ RATED",
+      "image": null,
+      "bgImage": null,
+      "emoji": "S",
+      "order": 3
+    },
+    {
+      "id": "site_1776720306659",
+      "name": "Sexmotarjam.com",
+      "url": "https://sexmotarjam.com/category/%d9%85%d8%aa%d8%b1%d8%ac%d9%85/%d8%a7%d8%ba%d8%aa%d8%b5%d8%a7%d8%a8/",
+      "color": "#e44097",
+      "categoryId": "++ RATED",
+      "image": null,
+      "bgImage": null,
+      "emoji": "S",
+      "order": 4
+    },
+    {
+      "id": "site_1777316640712",
+      "name": "Ixxx.com Classic",
+      "url": "https://www.ixxx.com/c/classic",
+      "color": "#1a1a2e",
+      "categoryId": "++ RATED",
+      "image": null,
+      "bgImage": null,
+      "emoji": "I",
+      "borderColor": "#ffffff",
+      "order": 5
+    },
+    {
+      "id": "site_1777316681038",
+      "name": "Egyshare.my",
+      "url": "https://egyshare.my/tag/%D8%A7%D9%81%D9%84%D8%A7%D9%85-%D9%84%D9%84%D9%83%D8%A8%D8%A7%D8%B1-%D9%81%D9%82%D8%B7-18/",
+      "color": "#1a1a2e",
+      "categoryId": "++ RATED",
+      "image": null,
+      "bgImage": null,
+      "emoji": "E",
+      "borderColor": "#ffffff",
+      "order": 6
+    },
+    {
+      "id": "site_1777316698006",
+      "name": "Vid.mycima.cc",
+      "url": "https://vid.mycima.cc/1-topvideos.php?c=1-movies-for-adult&page=2",
+      "color": "#1a1a2e",
+      "categoryId": "++ RATED",
+      "image": null,
+      "bgImage": null,
+      "emoji": "V",
+      "borderColor": "#ffffff",
+      "order": 7
+    }
+  ]
+}
